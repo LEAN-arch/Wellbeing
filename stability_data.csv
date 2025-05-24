@@ -1,0 +1,15 @@
+site,region,department,fc,shift,date,rotation_rate,retention_6m,retention_12m,retention_18m,hires,exits
+Site A,North,Operations,FC1,Day,2023-01-01,5,92,85,75,10,1
+Site A,North,HR,FC2,Day,2023-01-01,3,95,90,88,2,0
+Site B,South,Operations,FC1,Night,2023-01-01,8,88,80,70,8,2
+Site A,North,Operations,FC1,Day,2023-02-01,6,91,84,74,12,2
+Site B,South,IT,FC3,Day,2023-02-01,4,93,88,80,5,1
+Site A,North,Operations,FC1,Night,2023-03-01,7,90,82,72,9,1
+Site C,East,Sales,FC4,Day,2023-01-01,10,85,75,65,15,3
+Site C,East,Sales,FC4,Day,2023-02-01,12,83,73,63,10,2
+Site C,East,Sales,FC4,Day,2023-03-01,11,84,74,64,11,2
+Factory Alpha,West,Production,P1,Morning,2023-01-15,12,80,70,60,20,5
+Factory Alpha,West,Production,P1,Afternoon,2023-01-15,10,82,72,62,18,3
+Factory Beta,East,Logistics,L2,Night,2023-02-20,9,85,75,65,12,2
+Factory Beta,East,Logistics,L2,Morning,2023-02-20,7,88,78,68,10,1
+Office HQ,Central,Marketing,M1,Day,2023-03-10,4,95,90,85,5,0

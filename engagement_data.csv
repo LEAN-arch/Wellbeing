@@ -1,0 +1,12 @@
+site,region,department,fc,shift,initiative,punctuality,recognition_data,feedback_data,labor_climate_score,nps,participation,recognitions_count
+Site A,North,Operations,FC1,Day,4.2,4.5,3.8,4.0,75,50,85,15
+Site A,North,HR,FC2,Day,4.5,4.8,4.2,4.3,80,60,90,5
+Site B,South,Operations,FC1,Night,3.8,4.0,3.5,3.7,65,30,70,10
+Site C,East,Sales,FC4,Day,4.0,4.2,4.1,3.9,70,40,80,20
+Site A,North,Operations,FC1,Night,3.9,4.1,3.6,3.8,70,45,80,12
+Site B,South,IT,FC3,Day,4.3,4.6,4.0,4.1,78,55,88,8
+Factory Alpha,West,Production,P1,Morning,3.5,3.8,3.2,3.5,60,20,75,8
+Factory Alpha,West,Production,P1,Afternoon,3.7,4.0,3.4,3.6,62,25,77,10
+Factory Beta,East,Logistics,L2,Night,4.0,4.3,3.9,4.0,72,48,82,14
+Factory Beta,East,Logistics,L2,Morning,4.1,4.4,4.0,4.1,75,52,85,16
+Office HQ,Central,Marketing,M1,Day,4.6,4.9,4.5,4.4,85,70,92,25

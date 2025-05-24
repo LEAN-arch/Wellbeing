@@ -1,0 +1,15 @@
+site,region,department,fc,shift,month,incidents,near_misses,days_without_accidents,active_alerts
+Site A,North,Operations,FC1,Day,Jan,2,5,150,1
+Site A,North,Operations,FC1,Day,Feb,1,3,180,0
+Site B,South,Operations,FC1,Night,Jan,3,7,90,2
+Site B,South,Operations,FC1,Night,Feb,2,4,120,1
+Site C,East,Warehouse,FC5,Day,Jan,0,2,200,0
+Site C,East,Warehouse,FC5,Day,Feb,1,1,230,1
+Site A,North,Operations,FC1,Day,Mar,0,1,210,0
+Site B,South,Operations,FC1,Night,Mar,1,2,150,0
+Site C,East,Warehouse,FC5,Day,Mar,0,0,260,0
+Factory Alpha,West,Production,P1,Morning,Jan,1,4,50,3
+Factory Alpha,West,Production,P1,Afternoon,Feb,0,2,80,1
+Factory Beta,East,Logistics,L2,Night,Jan,2,6,30,2
+Factory Beta,East,Logistics,L2,Morning,Feb,0,1,60,0
+Office HQ,Central,Admin,A1,Day,Mar,0,0,300,0
