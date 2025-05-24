@@ -3,9 +3,9 @@ import plotly.express as px
 import pandas as pd # Not strictly needed here but often imported alongside
 
 # --- GENERAL APPLICATION SETTINGS ---
-APP_VERSION = "v1.0.0 (MVP - Insights & Glossary)"
-APP_TITLE_KEY = "app_title" # For browser tab, potentially shorter
-APP_ICON = "❤️‍🩹" # Icon symbolizing wellbeing/health
+APP_VERSION = "v1.0.1 (Config Fix)" # Incrementing for this fix
+APP_TITLE_KEY = "app_title" # Using a distinct key from dashboard_title for flexibility
+APP_ICON = "❤️‍🩹" # Icon reflecting wellbeing, health
 
 # --- FILTER DEFAULTS ---
 DEFAULT_SITES = []
@@ -23,49 +23,19 @@ COLOR_STATUS_WARNING = "#F1C40F"
 COLOR_STATUS_CRITICAL = "#E74C3C"
 COLOR_NEUTRAL_INFO = "#3498DB"
 COLOR_TEXT_SECONDARY = "#566573"
-COLOR_TARGET_LINE = "#2c3e50" # Dark, professional
+COLOR_TARGET_LINE = "#2c3e50"
 
 # --- KPI THRESHOLDS & TARGETS ---
-# Values are examples, adjust to your organization's context and data scales
-STABILITY_ROTATION_RATE = { # Percentage
-    "good": 8.0,    # Value <= this is 'good'
-    "warning": 15.0, # Value > 'good' and <= 'warning' is 'warning'. > 'warning' is 'critical'.
-    "target": 8.0   # Explicit target line for the gauge
-}
-STABILITY_RETENTION = { # Percentage
-    "good": 90.0,   # Value >= this is 'good'
-    "warning": 75.0 # Value < 'good' and >= 'warning' is 'warning'. < 'warning' is 'critical'.
-}
-
-SAFETY_INCIDENTS = { # Count (lower is better)
-    "good": 1.0,     # e.g., 0 or 1 incident is good
-    "warning": 5.0,  # e.g., 2-5 incidents is warning
-    "target": 0.0    # Ideal target is 0
-}
-SAFETY_DAYS_NO_INCIDENTS = { # Count (higher is better)
-    "good": 180,
-    "warning": 90 # Warning if it drops to this or below (and not yet 'good')
-}
-
-STRESS_LEVEL_PSYCHOSOCIAL = { # Example 0-10 scale (higher is worse)
-    "low": 3.5,        # This is effectively 'good' (<= low)
-    "medium": 7.0,     # This is effectively 'warning' (> low and <= medium)
-    "max_scale": 10.0  # For the visual scale of the indicator
-}
-
-ENGAGEMENT_ENPS = { # Score, e.g., -100 to 100 (higher is better)
-    "good": 50.0,
-    "warning": 10.0 # Warning if it's this low or lower (but not yet critical if you define that)
-}
-ENGAGEMENT_CLIMATE_SCORE = { # Score, e.g., 0-100 (higher is better)
-    "good": 80.0,
-    "warning": 60.0
-}
-ENGAGEMENT_PARTICIPATION = { # Percentage
-    "good": 75.0 # Target for good survey participation
-}
-ENGAGEMENT_RADAR_DIM_TARGET = 4.0 # Generic target for 1-5 scale radar items
-ENGAGEMENT_RADAR_DIM_SCALE_MAX = 5.0 # Max value for radar dimension axes
+STABILITY_ROTATION_RATE = { "good": 8.0, "warning": 15.0, "target": 8.0 }
+STABILITY_RETENTION = { "good": 90.0, "warning": 75.0 }
+SAFETY_INCIDENTS = { "good": 1.0, "warning": 5.0, "target": 0.0 }
+SAFETY_DAYS_NO_INCIDENTS = { "good": 180, "warning": 90 }
+STRESS_LEVEL_PSYCHOSOCIAL = { "low": 3.5, "medium": 7.0, "max_scale": 10.0 }
+ENGAGEMENT_ENPS = { "good": 50.0, "warning": 10.0 }
+ENGAGEMENT_CLIMATE_SCORE = { "good": 80.0, "warning": 60.0 }
+ENGAGEMENT_PARTICIPATION = { "good": 75.0 }
+ENGAGEMENT_RADAR_DIM_TARGET = 4.0
+ENGAGEMENT_RADAR_DIM_SCALE_MAX = 5.0
 
 # --- COLUMN MAPPING (Conceptual Keys to Actual CSV Column Names) ---
 COLUMN_MAP = {
@@ -91,6 +61,22 @@ COLUMN_MAP = {
     "workload_perception": "workload_perception", "psychological_signals": "psychological_signals",
 }
 
+# --- UI PLACEHOLDER TEXTS (MULTI-LINE STRINGS FOR MARKDOWN) ---
+PLACEHOLDER_TEXT_PLANT_MAP = """
+### Interactive Facility Map
+(Placeholder: This module is envisioned to visualize data spatially, such as staff distribution heatmaps for stress, incidents, or absenteeism. 
+Future development would involve integration with mapping libraries like Plotly Mapbox or Folium, and potentially real-time data feeds if ethically and technically feasible. 
+Ensuring accessibility for map interactions will be a key consideration.)
+"""
+
+PLACEHOLDER_TEXT_AI_INSIGHTS = """
+### Predictive AI Insights
+(Placeholder: This module aims to provide data-driven forecasts on psychosocial risks (e.g., based on aggregated Human Affect & Behavior Scores). 
+It could predict outcomes like burnout or turnover likelihood for specific areas/teams, ideally with confidence intervals. 
+Implementation requires significant historical data, trained machine learning models (e.g., using scikit-learn or TensorFlow), and robust data pipelines. 
+**Crucially, the fairness, transparency, and ethical implications of any AI-driven predictions must be paramount considerations during development and deployment.**)
+"""
+
 # --- TEXT STRINGS FOR LOCALIZATION (i18n) ---
 DEFAULT_LANG = "EN"
 
@@ -102,6 +88,8 @@ TEXT_STRINGS = {
         "alignment_note": "Aligned with NOM-035-STPS-2018, ISO 45003, and DEI principles.",
         "psych_safety_note": "Note: Data concerning individual wellbeing is aggregated and presented anonymously to uphold psychological safety, privacy, and align with DEI principles and regulatory standards.",
         "error_loading_data": "Error loading data from file: {}. Ensure the file exists and is correctly formatted.",
+        "check_file_path_instruction": "Please check the file path.", # Added from app.py
+        "exception_detail_prefix": "Exception", # Added from app.py
         
         "navigation_label": "Navigation", "dashboard_nav_label": "Dashboard", "glossary_nav_label": "Glossary",
         "filters_header": "Dashboard Filters", "language_selector": "Language",
@@ -155,8 +143,14 @@ TEXT_STRINGS = {
         "plant_map_title": "5. Interactive Facility Overview",
         "ai_insights_title": "6. Predictive Risk Insights",
         
-        "actionable_insights_title": "Actionable Insights & Recommendations", # New
+        "actionable_insights_title": "Actionable Insights & Recommendations",
         "no_insights_generated": "No specific insights generated for the current selection. Data may be within normal ranges or insufficient for detailed analysis.",
+        "no_insights_generated_stability": "Stability metrics appear within defined targets or data is insufficient for detailed trend analysis.",
+        "no_insights_generated_safety": "Safety metrics indicate performance within acceptable ranges or data is insufficient for specific alerts.",
+        "no_insights_generated_engagement": "Engagement indicators are generally positive or data is insufficient for specific recommendations.", # Used in app.py but might be the general key "engagement_no_critical_insights" from insights.py is better
+        "no_insights_generated_stress": "Stress indicators appear within acceptable ranges or data is insufficient for detailed trend analysis.",
+        "no_data_for_engagement_insights": "Insufficient data to generate engagement insights.", # Used in insights.py
+        "no_data_for_stress_insights": "Insufficient data to generate stress insights.", # Used in insights.py
 
 
         "no_data_available": "No data available for the selected filters in this module.",
@@ -188,60 +182,79 @@ TEXT_STRINGS = {
         "no_term_found": "No term found matching your search criteria.",
         "definition_label": "Definition",
         "glossary_empty_message": "The glossary is currently empty or could not be loaded.",
-        "language_name_full_EN": "English",
+        "language_name_full_EN": "English", # For full language name display
         "language_name_full_ES": "Español",
 
-        # Insight specific strings
+
+        # Insight specific strings (Ensure all placeholders like {rotation_val} are used consistently with insights.py kwargs)
         "rotation_high_alert": "High Rotation Alert",
-        "rotation_high_insight": "Average rotation ({rotation_val:.1f}%) exceeds warning ({warn_thresh}%). Investigate causes (e.g., exit interviews, filter by department/shift). Consider targeted retention strategies.",
+        "rotation_high_insight_v2": "Average rotation ({rotation_val}%) significantly exceeds warning ({warn_thresh}%). Target is {target_thresh}%. Prioritize root cause analysis for high-turnover areas (filter dashboard) and review exit interview data. Implement targeted retention programs for critical roles.",
         "rotation_moderate_warn": "Rotation Warning",
-        "rotation_moderate_insight": "Rotation rate ({rotation_val:.1f}%) is above desired ({good_thresh}%). Monitor trends and focus on at-risk groups or early tenure attrition.",
+        "rotation_moderate_insight_v2": "Rotation rate ({rotation_val}%) is above desired ({good_thresh}%). Monitor trends and focus on at-risk groups or early tenure attrition. Target: {target_thresh}%.",
         "rotation_good_status": "Good Rotation Rate",
-        "rotation_good_insight": "Rotation ({rotation_val:.1f}%) is within/below target ({good_thresh}%). Maintain positive engagement and development programs.",
+        "rotation_good_insight_v2": "Rotation rate ({rotation_val}%) meets or is below good level ({good_thresh}%). Maintain strong engagement and onboarding practices.",
         "rotation_no_data": "Rotation data unavailable for detailed insights.",
         "retention_low_alert":"Low 12-Month Retention",
-        "retention_low_insight": "12-month retention ({retention_val:.1f}%) is below warning level ({warn_thresh}%). Review onboarding, career pathing, and manager effectiveness for newer cohorts.",
+        "retention_low_insight_v2": "12-month retention ({retention_val}%) is critically low (below {warn_thresh}%). Target is {target_thresh}%. Investigate early attrition causes: onboarding effectiveness, manager support, role clarity, and growth opportunities within the first year.",
         "retention_needs_improvement":"12-Month Retention Needs Improvement",
-        "retention_improvement_insight":"12-month retention ({retention_val:.1f}%) is below target ({target_thresh}%). Focus on enhancing overall employee experience.",
+        "retention_improvement_insight_v2":"12-month retention ({retention_val}%) is below target ({target_thresh}%). Identify and address factors impacting new hire experience and commitment.",
+        "retention_good_status": "Good 12m Retention", # General status for retention
+        "retention_good_insight_detail": "12-month retention ({retention_val}%) meets/exceeds target ({target_thresh}%). Current strategies appear effective. Continue monitoring.",
         "review_hires_exits_trend":"Review Hires vs. Exits Trend",
         "hires_exits_insight_detail": "Analyze patterns. Sustained net employee loss requires strategic workforce planning adjustments.",
+        "net_loss_trend_warn": "Net Employee Loss Trend",
+        "net_loss_insight":"Averaging a net loss of {avg_change} employees per period. This indicates potential challenges in workforce replenishment or retention. Review talent acquisition strategies and drivers of attrition.",
+        "recent_loss_focus":"Focus on Recent Departures",
+        "recent_loss_insight_detail":"Recent period shows a net loss of {recent_change} employees. Address immediate concerns contributing to departures.",
         
         "high_incidents_alert": "High Incident Count",
-        "high_incidents_insight": "{count:.0f} incidents reported. Above warning level. Prioritize root cause analysis and implement corrective actions, focusing on high-frequency areas/types.",
+        "high_incidents_insight_v2": "{count} incidents this period (above warning {warn_thresh}). Critical review of high-risk tasks/areas needed. Implement immediate corrective actions and review safety training effectiveness.",
         "moderate_incidents_warn": "Moderate Incidents",
-        "moderate_incidents_insight": "{count:.0f} incidents reported. Review trends to prevent escalation. Strengthen near-miss reporting and proactive hazard identification.",
+        "moderate_incidents_insight_v2": "{count} incidents this period (target is {target_thresh}). Focus on proactive measures: near-miss analysis, safety walks, and toolbox talks.",
         "low_incidents_status": "Low Incident Count",
-        "low_incidents_insight": "{count:.0f} incidents. Good! Maintain vigilance and continue promoting proactive safety culture.",
+        "low_incidents_insight_v2": "{count} incidents. Excellent! Reinforce positive safety behaviors and maintain high standards of hazard identification.",
         "dwa_low_warn":"Days Without Incidents Low",
-        "dwa_low_insight": "Currently {days:.0f} days without a recordable incident, below the target. Reinforce safety protocols and conduct targeted safety awareness campaigns.",
+        "dwa_low_insight_v2": "{days} days without incidents is below warning level of {warn_thresh}. Review recent incident patterns and refresh safety focus in relevant areas.",
+        "dwa_needs_improvement":"Days Without Incidents: Monitor",
+        "dwa_improvement_insight": "{days} days without incidents. Aim to increase this towards the target of {target_thresh}+ days. Celebrate milestones reached.",
+        "dwa_good_status": "Good Days Without Incidents",
+        "dwa_good_insight_detail":"{days} days without incidents. Keep up the great work!",
+
 
         "enps_low_alert": "Low eNPS Alert",
-        "enps_low_insight": "eNPS ({enps_val:.0f}) is critically low, indicating a significant number of detractors. Urgently conduct pulse surveys or focus groups to understand dissatisfaction drivers.",
+        "enps_low_insight": "eNPS ({enps_val}) is critically low, indicating a significant number of detractors. Urgently gather feedback on dissatisfaction drivers.",
         "enps_needs_focus": "eNPS Needs Focus",
-        "enps_focus_insight": "eNPS ({enps_val:.0f}) suggests room for improving employee loyalty. Analyze feedback from passives and detractors to identify key improvement areas.",
+        "enps_focus_insight": "eNPS ({enps_val}) suggests room for improving employee loyalty. Analyze feedback from passives and detractors to identify key improvement areas.",
         "enps_good_status":"Healthy eNPS",
-        "enps_good_insight": "eNPS ({enps_val:.0f}) is healthy. Leverage promoters as change champions and gather insights on what makes their experience positive.",
+        "enps_good_insight": "eNPS ({enps_val}) is healthy. Leverage promoters as change champions and gather insights on what makes their experience positive.",
         "climate_low_alert": "Low Work Climate Score",
-        "climate_low_insight": "Work Climate Score ({climate_val:.1f}) is concerning. This may reflect issues with leadership, team dynamics, workload, or organizational culture. A detailed diagnostic is recommended.",
+        "climate_low_insight": "Work Climate Score ({climate_val}) is significantly low. This may reflect issues with leadership, culture, or work environment. A detailed diagnostic is recommended.",
+        "climate_needs_focus": "Climate Score: Needs Attention",
+        "climate_focus_insight": "Work Climate ({climate_val}) is below target ({target_thresh}). Address areas identified in survey feedback.",
+        "participation_low_warn":"Low Survey Participation",
+        "participation_low_insight":"Survey participation ({part_val}%) is below target ({target_thresh}%). Understand barriers to participation for more representative data.",
         "engagement_no_critical_insights":"Engagement metrics indicate no immediate critical concerns. Explore radar dimensions for specific strengths and opportunities.",
 
         "stress_high_alert":"High Stress Levels Detected",
-        "stress_high_insight": "Average psychosocial stress ({stress_val:.1f}) is high. Risk of burnout, errors, and turnover. Identify and address key stressors (workload, control, support). Refer to NOM-035 guidelines for intervention strategies.",
+        "stress_high_insight": "Average psychosocial stress ({stress_val}) is high. Risk of burnout, errors, and turnover. Identify and address key stressors (workload, control, support). Refer to NOM-035 guidelines for intervention strategies.",
         "stress_moderate_warn":"Moderate Stress Levels",
-        "stress_moderate_insight": "Average psychosocial stress ({stress_val:.1f}) is moderate. Monitor closely, especially in high-demand roles/departments. Promote available wellbeing resources and ensure manageable workloads.",
+        "stress_moderate_insight": "Average psychosocial stress ({stress_val}) is moderate. Monitor closely, especially in high-demand roles/departments. Promote available wellbeing resources and ensure manageable workloads.",
         "stress_low_status":"Low Stress Levels",
-        "stress_low_insight": "Average psychosocial stress ({stress_val:.1f}) is in a healthy range. Commendable! Continue to foster a supportive work environment and open communication channels.",
+        "stress_low_insight": "Average psychosocial stress ({stress_val}) is in a healthy range. Commendable! Continue to foster a supportive work environment and open communication channels.",
         "stress_trend_warn":"Concerning Stress Trend",
         "stress_trend_insight": "Recent trends suggest increasing workload perception or declining wellbeing signals. Proactively review team capacities and support mechanisms to mitigate burnout risk."
     },
     "ES": {
-        # --- ALL SPANISH TRANSLATIONS ---
+        # --- All SPANISH translations for the EN keys above ---
+        # (Ensure placeholders like {rotation_val} are kept the same in Spanish strings)
         "app_title": "Signos Vitales Laborales",
         "dashboard_title": "Tablero de Signos Vitales Laborales",
         "dashboard_subtitle": "Un Sistema de Inteligencia Centrado en el Ser Humano para el Bienestar y Rendimiento Organizacional.",
         "alignment_note": "Alineado con NOM-035-STPS-2018, ISO 45003 y principios DEI.",
         "psych_safety_note": "Nota: Los datos sobre el bienestar individual se presentan de forma anónima y agregada para garantizar la seguridad psicológica, la privacidad y cumplir con principios DEI y normativas.",
-        "error_loading_data": "Error al cargar datos del archivo: {}. Verifique la ruta y el formato.",
+        "error_loading_data": "Error al cargar datos del archivo: {}. Asegúrese de que el archivo exista y esté formateado correctamente.",
+        "check_file_path_instruction": "Por favor, verifique la ruta del archivo.",
+        "exception_detail_prefix": "Excepción",
         "navigation_label": "Navegación", "dashboard_nav_label": "Tablero Principal", "glossary_nav_label": "Glosario",
         "filters_header": "Filtros del Tablero", "language_selector": "Idioma",
         "select_site": "Sitio(s):", "select_region": "Región(es):", "select_department": "Departamento(s):",
@@ -287,15 +300,21 @@ TEXT_STRINGS = {
         "plant_map_title": "5. Vista Interactiva de Instalaciones",
         "ai_insights_title": "6. Perspectivas de Riesgo Predictivas",
         "actionable_insights_title": "Perspectivas Accionables y Recomendaciones",
-        "no_insights_generated": "No se generaron perspectivas específicas. Los datos podrían estar en rangos normales o ser insuficientes.",
+        "no_insights_generated": "No se generaron perspectivas específicas para la selección actual. Los datos podrían estar en rangos normales o ser insuficientes.",
+        "no_insights_generated_stability": "Métricas de estabilidad parecen dentro de objetivos o datos insuficientes para análisis detallado.",
+        "no_insights_generated_safety": "Métricas de seguridad indican desempeño aceptable o datos insuficientes para alertas específicas.",
+        "no_insights_generated_engagement":"Indicadores de compromiso generalmente positivos o datos insuficientes para recomendaciones específicas.",
+        "no_insights_generated_stress":"Indicadores de estrés parecen dentro de rangos aceptables o datos insuficientes para análisis detallado.",
+        "no_data_for_engagement_insights":"Datos insuficientes para generar perspectivas de compromiso.",
+        "no_data_for_stress_insights":"Datos insuficientes para generar perspectivas de estrés.",
         "no_data_available": "No hay datos disponibles para los filtros seleccionados.",
         "no_data_for_selection": "Sin datos para la selección actual.",
-        "no_data_hires_exits": "Datos de contrataciones/bajas no disponibles.",
-        "no_data_incidents_near_misses": "Datos de incidentes/casi incidentes no disponibles.",
+        "no_data_hires_exits": "Datos de contrataciones/bajas no disponibles para la tendencia.",
+        "no_data_incidents_near_misses": "Datos de incidentes/casi incidentes no disponibles para el gráfico.",
         "no_data_radar_columns": "Faltan columnas para el radar de compromiso.",
         "no_data_radar": "Datos insuficientes para el radar de compromiso.",
-        "no_data_shift_load": "Datos de carga de turno no disponibles.",
-        "no_data_workload_psych": "Datos de carga/señales de bienestar no disponibles.",
+        "no_data_shift_load": "Datos de carga de turno no disponibles para el gráfico.",
+        "no_data_workload_psych": "Datos de carga/señales de bienestar no disponibles para tendencia.",
         "optional_modules_header": "Visión Futura: Módulos Extendidos",
         "show_optional_modules": "Mostrar Funcionalidades Planeadas",
         "optional_modules_title": "Módulos Estratégicos y Operativos Planeados",
@@ -317,52 +336,65 @@ TEXT_STRINGS = {
         "glossary_empty_message": "El glosario está vacío o no se pudo cargar.",
         "language_name_full_EN": "Inglés",
         "language_name_full_ES": "Español",
-
         "rotation_high_alert": "Alerta: Alta Rotación",
-        "rotation_high_insight": "Rotación promedio ({rotation_val:.1f}%) excede advertencia ({warn_thresh}%). Investigar causas y aplicar estrategias de retención.",
+        "rotation_high_insight_v2": "Rotación promedio ({rotation_val}%) excede significativamente advertencia ({warn_thresh}%). Objetivo: {target_thresh}%. Priorizar análisis de causa raíz en áreas de alta rotación (filtrar tablero) y revisar entrevistas de salida. Implementar programas de retención específicos.",
         "rotation_moderate_warn": "Advertencia: Rotación",
-        "rotation_moderate_insight": "Tasa de rotación ({rotation_val:.1f}%) sobre nivel deseado ({good_thresh}%). Monitorear tendencias y grupos en riesgo.",
+        "rotation_moderate_insight_v2": "Tasa de rotación ({rotation_val}%) está sobre el nivel deseado ({good_thresh}%). Monitorear tendencias y enfocarse en grupos en riesgo o deserción temprana. Objetivo: {target_thresh}%.",
         "rotation_good_status": "Tasa de Rotación Adecuada",
-        "rotation_good_insight": "Rotación ({rotation_val:.1f}%) dentro/bajo objetivo ({good_thresh}%). Mantener compromiso positivo.",
-        "rotation_no_data": "Datos de rotación no disponibles para análisis detallado.",
+        "rotation_good_insight_v2": "Tasa de rotación ({rotation_val}%) cumple o está por debajo del nivel bueno ({good_thresh}%). Mantener fuertes prácticas de compromiso e incorporación.",
+        "rotation_no_data": "Datos de rotación no disponibles para perspectivas detalladas.",
         "retention_low_alert":"Alerta: Baja Retención a 12 Meses",
-        "retention_low_insight": "Retención a 12 meses ({retention_val:.1f}%) bajo advertencia ({warn_thresh}%). Revisar incorporación y desarrollo.",
-        "retention_needs_improvement":"Retención a 12 Meses: Área de Mejora",
-        "retention_improvement_insight":"Retención a 12 meses ({retention_val:.1f}%) bajo objetivo ({target_thresh}%). Continuar mejorando experiencia.",
+        "retention_low_insight_v2": "Retención a 12 meses ({retention_val}%) es críticamente baja (bajo {warn_thresh}%). Objetivo: {target_thresh}%. Investigar causas de deserción temprana: efectividad de onboarding, apoyo gerencial, claridad del rol y oportunidades de crecimiento.",
+        "retention_needs_improvement":"Retención a 12 Meses Necesita Mejora",
+        "retention_improvement_insight_v2":"Retención a 12 meses ({retention_val}%) está por debajo del objetivo ({target_thresh}%). Identificar y abordar factores que impactan la experiencia y compromiso de nuevos empleados.",
+        "retention_good_status": "Buena Retención a 12m",
+        "retention_good_insight_detail": "Retención a 12 meses ({retention_val}%) cumple/supera objetivo ({target_thresh}%). Estrategias actuales efectivas.",
         "review_hires_exits_trend":"Revisar Tendencia Contrataciones vs. Bajas",
-        "hires_exits_insight_detail": "Analizar patrones. Pérdida neta constante de empleados puede indicar problemas sistémicos.",
-        
+        "hires_exits_insight_detail": "Analizar patrones. Pérdida neta constante de empleados requiere ajustes estratégicos de planificación de la fuerza laboral.",
+        "net_loss_trend_warn":"Tendencia de Pérdida Neta de Empleados",
+        "net_loss_insight":"Promedio de pérdida neta de {avg_change} empleados por período. Indica desafíos en reposición o retención. Revisar estrategias de adquisición de talento y causas de deserción.",
+        "recent_loss_focus":"Enfocarse en Bajas Recientes",
+        "recent_loss_insight_detail":"Período reciente muestra pérdida neta de {recent_change} empleados. Abordar preocupaciones inmediatas que contribuyen a las bajas.",
         "high_incidents_alert": "Alto Número de Incidentes",
-        "high_incidents_insight": "{count:.0f} incidentes. Arriba de advertencia. Priorizar análisis de causa raíz e implementar acciones correctivas.",
+        "high_incidents_insight_v2": "{count} incidentes este período (sobre advertencia {warn_thresh}). Revisión crítica de tareas/áreas de alto riesgo. Implementar acciones correctivas y revisar efectividad de capacitación en seguridad.",
         "moderate_incidents_warn": "Incidentes Moderados",
-        "moderate_incidents_insight": "{count:.0f} incidentes. Revisar tendencias. Fortalecer reporte de casi incidentes.",
+        "moderate_incidents_insight_v2": "{count} incidentes este período (objetivo es {target_thresh}). Enfocarse en medidas proactivas: análisis de casi-accidentes, rondas de seguridad y charlas informativas.",
         "low_incidents_status": "Bajo Número de Incidentes",
-        "low_incidents_insight": "{count:.0f} incidentes. ¡Bien! Mantener vigilancia y cultura proactiva de seguridad.",
+        "low_incidents_insight_v2": "{count} incidentes. ¡Excelente! Reforzar comportamientos seguros y mantener altos estándares de identificación de peligros.",
         "dwa_low_warn":"Pocos Días Sin Incidentes",
-        "dwa_low_insight": "{days:.0f} días sin incidentes, bajo el objetivo. Reforzar protocolos y campañas de seguridad.",
-
+        "dwa_low_insight_v2": "{days} días sin incidentes está por debajo del nivel de advertencia de {warn_thresh}. Revisar patrones de incidentes recientes y refrescar el enfoque de seguridad.",
+        "dwa_needs_improvement":"Días Sin Incidentes: Monitorear",
+        "dwa_improvement_insight": "{days} días sin incidentes. Aspirar a aumentar hacia el objetivo de {target_thresh}+ días. Celebrar hitos.",
+        "dwa_good_status": "Buenos Días Sin Incidentes",
+        "dwa_good_insight_detail":"{days} días sin incidentes. ¡Mantener el buen trabajo!",
         "enps_low_alert": "Alerta: eNPS Bajo",
-        "enps_low_insight": "eNPS ({enps_val:.0f}) críticamente bajo. Urgente recopilar feedback sobre causas de insatisfacción.",
+        "enps_low_insight": "eNPS ({enps_val}) críticamente bajo. Urgente obtener retroalimentación sobre motivos de insatisfacción.",
         "enps_needs_focus": "eNPS Necesita Atención",
-        "enps_focus_insight": "eNPS ({enps_val:.0f}) indica espacio para mejorar lealtad. Analizar feedback de pasivos/detractores.",
+        "enps_focus_insight": "eNPS ({enps_val}) sugiere margen para mejorar lealtad. Analizar retroalimentación de pasivos y detractores.",
         "enps_good_status":"eNPS Saludable",
-        "enps_good_insight": "eNPS ({enps_val:.0f}) saludable. Aprovechar promotores como embajadores.",
+        "enps_good_insight": "eNPS ({enps_val}) saludable. Usar promotores como campeones del cambio.",
         "climate_low_alert": "Puntuación Baja de Clima Laboral",
-        "climate_low_insight": "Clima Laboral ({climate_val:.1f}) preocupante. Puede indicar problemas de liderazgo, cultura o entorno. Se recomienda diagnóstico.",
-        "engagement_no_critical_insights":"Métricas de compromiso sin alertas críticas. Explorar radar para fortalezas/oportunidades.",
-
+        "climate_low_insight": "Clima Laboral ({climate_val}) preocupante. Podría reflejar problemas de liderazgo, cultura o entorno. Se recomienda diagnóstico detallado.",
+        "climate_needs_focus":"Clima Laboral: Requiere Atención",
+        "climate_focus_insight":"Clima Laboral ({climate_val}) bajo el objetivo ({target_thresh}). Atender áreas identificadas en retroalimentación.",
+        "participation_low_warn":"Baja Participación en Encuesta",
+        "participation_low_insight":"Participación en encuesta ({part_val}%) bajo el objetivo ({target_thresh}%). Entender barreras para datos más representativos.",
+        "engagement_no_critical_insights":"Métricas de compromiso sin alertas críticas. Explorar radar para detalles.",
         "stress_high_alert":"Alerta: Niveles Altos de Estrés",
-        "stress_high_insight": "Estrés psicosocial promedio ({stress_val:.1f}) alto. Riesgo de burnout. Investigar carga laboral, apoyo, presiones. Ver NOM-035.",
+        "stress_high_insight": "Estrés psicosocial promedio ({stress_val}) alto. Riesgo de burnout, errores y rotación. Identificar y abordar estresores. Ver NOM-035.",
         "stress_moderate_warn":"Niveles Moderados de Estrés",
-        "stress_moderate_insight": "Estrés psicosocial promedio ({stress_val:.1f}) moderado. Monitorear de cerca, promover recursos de bienestar.",
+        "stress_moderate_insight": "Estrés psicosocial promedio ({stress_val}) moderado. Monitorear de cerca, promover recursos de bienestar y cargas manejables.",
         "stress_low_status":"Niveles Bajos de Estrés",
-        "stress_low_insight": "Estrés psicosocial promedio ({stress_val:.1f}) en rango saludable. ¡Excelente! Continuar fomentando apoyo y comunicación.",
+        "stress_low_insight": "Estrés psicosocial promedio ({stress_val}) en rango saludable. ¡Felicitaciones! Continuar fomentando un ambiente de apoyo.",
         "stress_trend_warn":"Tendencia Preocupante de Estrés",
-        "stress_trend_insight": "Tendencias recientes: percepción de carga al alza, señales de bienestar a la baja. Revisar capacidades y apoyo."
+        "stress_trend_insight": "Tendencias recientes: percepción de carga al alza o señales de bienestar a la baja. Revisar capacidades y apoyo para mitigar riesgo de burnout."
+        # ... plus any other missing specific insight keys
     }
 }
 
-# --- File Paths (Ensure these files are in the same directory as app.py for MVP) ---
+# --- File Paths ---
+# Assuming CSVs are in the same directory as app.py.
+# If in a 'data/' subfolder, change to e.g., "data/stability_data.csv"
 STABILITY_DATA_FILE = "stability_data.csv"
 SAFETY_DATA_FILE = "safety_data.csv"
 ENGAGEMENT_DATA_FILE = "engagement_data.csv"
