@@ -22,17 +22,17 @@ def get_status_by_thresholds(value: Optional[Union[int, float, np.number]],
     good_f = float(threshold_good) if threshold_good is not None and pd.notna(threshold_good) else None
     warn_f = float(threshold_warning) if threshold_warning is not None and pd.notna(threshold_warning) else None
 
-    if higher_is_worse: # Lower value is better
+    if higher_is_worse:
         if good_f is not None and val_f <= good_f: return "good"
         if warn_f is not None and (good_f is None or val_f > good_f) and val_f <= warn_f: return "warning"
         if (warn_f is not None and val_f > warn_f) or \
            (warn_f is None and good_f is not None and val_f > good_f): return "critical"
-    else: # Higher value is better
+    else: 
         if good_f is not None and val_f >= good_f: return "good"
         if warn_f is not None and (good_f is None or val_f < good_f) and val_f >= warn_f: return "warning"
         if (warn_f is not None and val_f < warn_f) or \
            (warn_f is None and good_f is not None and val_f < good_f): return "critical"
-    return None # No clear status matched
+    return None
 
 def get_semaforo_color(status: Optional[str]) -> str:
     if status == "good": return config.COLOR_STATUS_GOOD
@@ -40,8 +40,7 @@ def get_semaforo_color(status: Optional[str]) -> str:
     if status == "critical": return config.COLOR_STATUS_CRITICAL
     return config.COLOR_TEXT_SECONDARY
 
-
-# --- KPI Gauge Visualization (Substantially Improved) ---
+# --- KPI Gauge Visualization (SME Revision for Friendliness & Actionability) ---
 def create_kpi_gauge(value: Optional[Union[int, float, np.number]], title_key: str, lang: str,
                      unit: str = "%", higher_is_worse: bool = True,
                      threshold_good: Optional[Union[int, float, np.number]] = None,
@@ -58,94 +57,91 @@ def create_kpi_gauge(value: Optional[Union[int, float, np.number]], title_key: s
         title_final = f"{title_base}<br><span style='font-size:0.8em;color:{config.COLOR_TEXT_SECONDARY};font-weight:normal;'>{subtitle_str}</span>"
 
     current_val_numeric = float(value) if pd.notna(value) and isinstance(value, (int,float,np.number)) else 0.0
-    current_val_for_display = float(value) if pd.notna(value) and isinstance(value, (int,float,np.number)) else None # Pass None to Indicator for its formatting
+    current_val_for_display = float(value) if pd.notna(value) and isinstance(value, (int,float,np.number)) else None
 
-    delta_obj = {}
-    if previous_value is not None and pd.notna(previous_value) and isinstance(previous_value, (int,float,np.number)) and current_val_for_display is not None:
+    delta_obj = {} 
+    if previous_value is not None and pd.notna(previous_value) and isinstance(previous_value, (int, float, np.number)) and current_val_for_display is not None:
         delta_ref_val = float(previous_value)
+        delta_val = current_val_numeric - delta_ref_val
+        
+        increasing_color = config.COLOR_STATUS_CRITICAL if higher_is_worse else config.COLOR_STATUS_GOOD
+        decreasing_color = config.COLOR_STATUS_GOOD if higher_is_worse else config.COLOR_STATUS_CRITICAL
+        
+        delta_font_color = config.COLOR_TEXT_SECONDARY 
+        if abs(delta_val) > 1e-9 : 
+            delta_font_color = increasing_color if delta_val > 0 else decreasing_color
+        
         delta_obj = {
             'reference': delta_ref_val,
-            'increasing': {'color': config.COLOR_STATUS_CRITICAL if higher_is_worse else config.COLOR_STATUS_GOOD, 'symbol': "▲"},
-            'decreasing': {'color': config.COLOR_STATUS_GOOD if higher_is_worse else config.COLOR_STATUS_CRITICAL, 'symbol': "▼"},
-            'font': {'size': 12}
+            'increasing': {'color': increasing_color, 'symbol': "▲"}, 
+            'decreasing': {'color': decreasing_color, 'symbol': "▼"}, 
+            'font': {'size': 12, 'color': delta_font_color} 
         }
-        # Add current status color to delta text itself if value changed
-        delta_val = current_val_numeric - delta_ref_val
-        if abs(delta_val) > 1e-9 : # If there is a change
-            delta_obj['font']['color'] = delta_obj['increasing']['color'] if delta_val > 0 else delta_obj['decreasing']['color']
-        else: # No change, neutral color
-            delta_obj['font']['color'] = config.COLOR_TEXT_SECONDARY
 
-
-    # Dynamic max_value for the gauge axis
     if max_value_override is not None and pd.notna(max_value_override):
         axis_max_val = float(max_value_override)
     else:
         val_candidates_for_max = [1.0]
-        if pd.notna(current_val_numeric): val_candidates_for_max.append(abs(current_val_numeric) * 1.4) # Give more headroom
-        
+        if pd.notna(current_val_numeric): val_candidates_for_max.append(abs(current_val_numeric) * 1.4)
         ref_points_for_max = [threshold_good, threshold_warning, target_line_value]
         valid_ref_points_for_max = [float(p) for p in ref_points_for_max if p is not None and pd.notna(p)]
         if valid_ref_points_for_max: val_candidates_for_max.append(max(valid_ref_points_for_max) * 1.25)
-        
         if not valid_ref_points_for_max and (not pd.notna(current_val_numeric) or current_val_numeric == 0):
-             val_candidates_for_max.append(100.0 if unit == "%" else 10.0) # Contextual default
-
+             val_candidates_for_max.append(100.0 if unit == "%" else 10.0)
         axis_max_val = max(val_candidates_for_max)
         if axis_max_val <= (current_val_numeric if pd.notna(current_val_numeric) else 0):
-            axis_max_val = (current_val_numeric * 1.2) if pd.notna(current_val_numeric) and current_val_numeric > 0 else (axis_max_val * 1.2 or 10.0)
-        if axis_max_val <= 0 : axis_max_val = 10.0
+            axis_max_val = (current_val_numeric * 1.1) if pd.notna(current_val_numeric) and current_val_numeric > 0 else (axis_max_val * 1.1 or 10.0)
+        if axis_max_val <= 0: axis_max_val = 10.0
 
-    # Gauge steps for coloring background
-    gauge_color_steps = []
-    num_th_good_val = float(threshold_good) if threshold_good is not None and pd.notna(threshold_good) else None
-    num_th_warn_val = float(threshold_warning) if threshold_warning is not None and pd.notna(threshold_warning) else None
-    
-    if num_th_good_val is not None and num_th_warn_val is not None: # Ensure logical threshold order
-        if higher_is_worse and num_th_warn_val < num_th_good_val: num_th_warn_val = num_th_good_val
-        if not higher_is_worse and num_th_warn_val > num_t_good_val: num_t_warn_val = num_t_good_val
-        
-    current_step_range_start = 0.0
+    gauge_steps = []
+    num_t_good = float(threshold_good) if threshold_good is not None and pd.notna(threshold_good) else None
+    num_t_warn = float(threshold_warning) if threshold_warning is not None and pd.notna(threshold_warning) else None
+    if num_t_good is not None and num_t_warn is not None:
+        if higher_is_worse and num_t_warn < num_t_good: num_t_warn = num_t_good
+        if not higher_is_worse and num_t_warn > num_t_good: num_t_warn = num_t_good
+    range_start = 0.0
     if higher_is_worse:
-        if num_th_good_val is not None:
-            gauge_color_steps.append({'range': [current_step_range_start, num_th_good_val], 'color': config.COLOR_STATUS_GOOD})
-            current_step_range_start = num_th_good_val
-        if num_th_warn_val is not None and num_t_warn_val > current_step_range_start:
-            gauge_color_steps.append({'range': [current_step_range_start, num_th_warn_val], 'color': config.COLOR_STATUS_WARNING})
-            current_step_range_start = num_t_warn_val
-        gauge_color_steps.append({'range': [current_step_range_start, axis_max_val], 'color': config.COLOR_STATUS_CRITICAL})
-    else: 
-        if num_th_warn_val is not None: 
-            gauge_color_steps.append({'range': [current_step_range_start, num_th_warn_val], 'color': config.COLOR_STATUS_CRITICAL})
-            current_step_range_start = num_t_warn_val
-        if num_th_good_val is not None and num_th_good_val > current_step_range_start:
-            gauge_color_steps.append({'range': [current_step_range_start, num_th_good_val], 'color': config.COLOR_STATUS_WARNING})
-            current_step_range_start = num_th_good_val
-        gauge_color_steps.append({'range': [current_step_range_start, axis_max_val], 'color': config.COLOR_STATUS_GOOD})
-
-    if not gauge_color_steps: gauge_color_steps.append({'range': [0, axis_max_val], 'color': config.COLOR_NEUTRAL_INFO})
+        if num_t_good is not None:
+            gauge_steps.append({'range': [range_start, num_t_good], 'color': config.COLOR_STATUS_GOOD, 'name': get_lang_text(lang, 'good_label')})
+            range_start = num_t_good
+        if num_t_warn is not None and num_t_warn > range_start:
+            gauge_steps.append({'range': [range_start, num_t_warn], 'color': config.COLOR_STATUS_WARNING, 'name': get_lang_text(lang, 'warning_label')})
+            range_start = num_t_warn
+        gauge_steps.append({'range': [range_start, axis_max_val], 'color': config.COLOR_STATUS_CRITICAL, 'name': get_lang_text(lang, 'critical_label')})
+    else:
+        if num_t_warn is not None:
+            gauge_steps.append({'range': [range_start, num_t_warn], 'color': config.COLOR_STATUS_CRITICAL, 'name': get_lang_text(lang, 'critical_label')})
+            range_start = num_t_warn
+        if num_t_good is not None and num_t_good > range_start:
+            gauge_steps.append({'range': [range_start, num_t_good], 'color': config.COLOR_STATUS_WARNING, 'name': get_lang_text(lang, 'warning_label')})
+            range_start = num_t_good
+        gauge_steps.append({'range': [range_start, axis_max_val], 'color': config.COLOR_STATUS_GOOD, 'name': get_lang_text(lang, 'good_label')})
+    if not gauge_steps: gauge_steps.append({'range': [0, axis_max_val], 'color': config.COLOR_NEUTRAL_INFO})
     
     target_line_val_float = float(target_line_value) if target_line_value is not None and pd.notna(target_line_value) else None
-    
-    current_status_for_number_color = get_status_by_thresholds(current_val_numeric, higher_is_worse, num_th_good_val, num_th_warn_val)
+    current_status_for_number_color = get_status_by_thresholds(current_val_numeric, higher_is_worse, num_t_good, num_t_warn)
     number_display_color = get_semaforo_color(current_status_for_number_color) if current_status_for_number_color else config.COLOR_TARGET_LINE
 
+    number_format_str = ".1f" 
+    if unit == "%": number_format_str = ".1f" 
+    elif pd.notna(current_val_for_display) and float(current_val_for_display) == int(current_val_for_display) and abs(float(current_val_for_display)) >=1:
+        number_format_str = ".0f"
 
     fig = go.Figure(go.Indicator(
         mode="gauge+number" + ("+delta" if delta_obj else ""),
         value=current_val_for_display,
         title={'text': title_final, 'font': {'size': 13, 'color': config.COLOR_TEXT_SECONDARY}},
-        number={'font': {'size': 30, 'color': number_display_color}, # Color number based on status
-                'suffix': unit if unit and pd.notna(current_val_for_display) else "", 'valueformat': ".1f"},
+        number={'font': {'size': 30, 'color': number_display_color}, 
+                'suffix': unit if unit and pd.notna(current_val_for_display) else "", 'valueformat': number_format_str},
         delta=delta_obj,
         gauge={
             'axis': {'range': [0, axis_max_val], 'tickwidth': 1, 'tickcolor': "rgba(0,0,0,0.2)", 'nticks': 5, 'tickfont':{'size':9}},
-            'bar': {'color': "rgba(0,0,0,0.7)", 'thickness': 0.1, 'line':{'color':"rgba(0,0,0,1)", 'width':0.5}}, # Thin, dark pointer bar
-            'bgcolor': "rgba(255,255,255,0.0)", # Make gauge area transparent if steps are good
+            'bar': {'color': "rgba(0,0,0,0.8)", 'thickness': 0.15, 'line':{'color':"rgba(0,0,0,1)", 'width':0.5}},
+            'bgcolor': "rgba(255,255,255,0.0)", 
             'borderwidth': 0.5, 'bordercolor': "rgba(0,0,0,0.1)",
-            'steps': gauge_color_steps,
+            'steps': gauge_steps,
             'threshold': {
-                'line': {'color': config.COLOR_TARGET_LINE, 'width': 2},
+                'line': {'color': config.COLOR_TARGET_LINE, 'width': 2}, 
                 'thickness': 0.75, 'value': target_line_val_float
             } if target_line_val_float is not None else {}
         }
@@ -155,14 +151,15 @@ def create_kpi_gauge(value: Optional[Union[int, float, np.number]], title_key: s
 
 # --- Trend Chart Visualization (Substantially Improved) ---
 def create_trend_chart(df_input: pd.DataFrame, date_col: str,
-                       value_cols_map: Dict[str, str], title_key: str, lang: str,
+                       value_cols_map: Dict[str, str], # {localized_label_key_for_legend: actual_col_name_in_df}
+                       title_key: str, lang: str,
                        y_axis_title_key: str = "value_axis_label", x_axis_title_key: str = "date_time_axis_label",
                        show_average_line: bool = False,
                        target_value_map: Optional[Dict[str, Union[int, float]]] = None, # {actual_col_name: target_val}
                        rolling_avg_window: Optional[int] = None,
                        value_col_units_map: Optional[Dict[str, str]] = None, # {actual_col_name: unit_string}
-                       y_axis_format_str: Optional[str] = ",.1f") -> go.Figure:
-    df = df_input.copy()
+                       y_axis_format_str: Optional[str] = ",.1f") -> go.Figure: 
+    df = df_input.copy() 
     title_text = get_lang_text(lang, title_key)
     x_title_text = get_lang_text(lang, x_axis_title_key)
     y_title_text = get_lang_text(lang, y_axis_title_key)
@@ -172,167 +169,158 @@ def create_trend_chart(df_input: pd.DataFrame, date_col: str,
             annotations=[dict(text=get_lang_text(lang, 'no_data_for_selection'), showarrow=False, xref="paper", yref="paper", x=0.5, y=0.5, font_size=12)])
 
     fig = go.Figure()
-    colors = px.colors.qualitative.D3 # Another good categorical palette
+    colors = px.colors.qualitative.D3 
     plotted_actual_cols_list = []
 
-    for i, (display_label_key, actual_data_col) in enumerate(value_cols_map.items()):
-        if actual_data_col not in df.columns or not pd.api.types.is_numeric_dtype(df[actual_data_col]): continue
-        plotted_actual_cols_list.append(actual_data_col)
+    for i, (display_label_key, actual_col_name) in enumerate(value_cols_map.items()):
+        if actual_col_name not in df.columns or not pd.api.types.is_numeric_dtype(df[actual_col_name]):
+            continue 
+        plotted_actual_cols_list.append(actual_col_name)
         
         line_color = colors[i % len(colors)]
-        legend_display_name = get_lang_text(lang, display_label_key, actual_data_col.replace('_',' ').title())
-        unit_str = value_col_units_map.get(actual_data_col, "") if value_col_units_map else ""
-        
-        fig.add_trace(go.Scatter(x=df[date_col], y=df[actual_data_col], mode='lines+markers', name=legend_display_name,
-            line=dict(color=line_color, width=2.5), marker=dict(size=6, symbol="circle"),
+        legend_display_name = get_lang_text(lang, display_label_key, actual_col_name.replace('_',' ').title())
+        unit = value_col_units_map.get(actual_col_name, "") if value_col_units_map else ""
+        hover_fmt = y_axis_format_str if y_axis_format_str else ",.2f" 
+
+        fig.add_trace(go.Scatter(x=df[date_col], y=df[actual_col_name], mode='lines+markers', name=legend_display_name,
+            line=dict(color=line_color, width=2.5), marker=dict(size=6, symbol="circle"), # Changed marker to filled
             hovertemplate=(f"<b>{legend_display_name}</b><br>" +
-                           f"{get_lang_text(lang, 'date_label','Date')}: %{{x|%b %d, %Y}}<br>" + # Use %b for abbreviated month
-                           f"{y_title_text}: %{{y:{y_axis_format_str if y_axis_format_str else ',.2f'}}}{unit_str}<extra></extra>")
+                           f"{get_lang_text(lang, 'date_label', 'Date')}: %{{x|%b %d, %Y}}<br>" +
+                           f"{y_title_text}: %{{y:{hover_fmt}}}{unit}<extra></extra>")
         ))
 
     if rolling_avg_window and isinstance(rolling_avg_window, int) and rolling_avg_window > 0:
-        for i, actual_data_col in enumerate(plotted_actual_cols_list):
+        for i, actual_col_name in enumerate(plotted_actual_cols_list):
             if len(df) >= rolling_avg_window :
-                display_label_key = [k for k,v in value_cols_map.items() if v == actual_data_col][0]
-                base_name = get_lang_text(lang, display_label_key)
+                original_display_key = [k for k,v in value_cols_map.items() if v == actual_col_name][0]
+                base_name = get_lang_text(lang, original_display_key)
                 ma_legend_name = f"{base_name} ({rolling_avg_window}-p MA)"
-                unit_str = value_col_units_map.get(actual_data_col, "") if value_col_units_map else ""
-                # Use unique name for temp column
-                temp_rolling_col = f"_rolling_{actual_data_col}"
-                df[temp_rolling_col] = df[actual_data_col].rolling(window=rolling_avg_window, center=True, min_periods=1).mean()
+                unit = value_col_units_map.get(actual_col_name, "") if value_col_units_map else ""
+                temp_rolling_col = f"_{actual_col_name}_rolling_avg_temp" 
+                df[temp_rolling_col] = df[actual_col_name].rolling(window=rolling_avg_window, center=True, min_periods=1).mean()
                 fig.add_trace(go.Scatter(x=df[date_col], y=df[temp_rolling_col], mode='lines', name=ma_legend_name,
-                    line=dict(color=colors[i % len(colors)], width=1.5, dash='longdash'), opacity=0.6, # Softer rolling line
+                    line=dict(color=colors[i % len(colors)], width=1.5, dash='longdash'), opacity=0.7, # More distinct dash
                     hovertemplate=(f"<b>{ma_legend_name}</b><br>" +
-                                   f"{get_lang_text(lang, 'date_label','Date')}: %{{x|%b %d, %Y}}<br>" +
-                                   f"{y_title_text}: %{{y:{y_axis_format_str if y_axis_format_str else ',.2f'}}}{unit_str}<extra></extra>")
+                                   f"{get_lang_text(lang, 'date_label', 'Date')}: %{{x|%b %d, %Y}}<br>" +
+                                   f"{y_title_text}: %{{y:{hover_fmt}}}{unit}<extra></extra>")
                 ))
     
-    for i, actual_data_col in enumerate(plotted_actual_cols_list):
-        display_label_key = [k for k,v in value_cols_map.items() if v == actual_data_col][0]
-        series_name_disp = get_lang_text(lang, display_label_key)
+    for i, actual_col_name in enumerate(plotted_actual_cols_list):
+        original_display_key = [k for k,v in value_cols_map.items() if v == actual_col_name][0]
+        series_name_disp = get_lang_text(lang, original_display_key)
         line_color = colors[i % len(colors)]
         if show_average_line:
-            avg_value = df[actual_data_col].mean()
+            avg_value = df[actual_col_name].mean()
             if pd.notna(avg_value):
-                fig.add_hline(y=avg_value, line_dash="dashdot", line_color=line_color, opacity=0.5,
+                fig.add_hline(y=avg_value, line_dash="dashdot", line_color=line_color, opacity=0.5, # Changed dash
                               annotation_text=f"{get_lang_text(lang, 'average_label')} {series_name_disp}: {avg_value:{y_axis_format_str if y_axis_format_str else ',.1f'}}",
-                              annotation_position="bottom right" if i%2==0 else "bottom left", annotation_font_size=9, annotation_bgcolor="rgba(255,255,255,0.75)")
-        if target_value_map and actual_data_col in target_value_map and pd.notna(target_value_map[actual_data_col]):
-            target_val_line = target_value_map[actual_data_col]
-            fig.add_hline(y=target_val_line, line_dash="solid", line_color=config.COLOR_TARGET_LINE, line_width=1.5, opacity=0.9,
+                              annotation_position="bottom left" if i%2==0 else "top right", # Alternate position
+                              annotation_font_size=9, annotation_bgcolor="rgba(255,255,255,0.75)")
+        if target_value_map and actual_col_name in target_value_map and pd.notna(target_value_map[actual_col_name]):
+            target_val_line = target_value_map[actual_col_name]
+            fig.add_hline(y=target_val_line, line_dash="solid", line_color=config.COLOR_TARGET_LINE, line_width=1.8, opacity=0.9, # Solid for target
                           annotation_text=f"{get_lang_text(lang, 'target_label')} {series_name_disp}: {target_val_line:{y_axis_format_str if y_axis_format_str else ',.1f'}}",
-                          annotation_position="top left" if i%2==0 else "top right", annotation_font_size=10, annotation_font_color=config.COLOR_TARGET_LINE, annotation_bgcolor="rgba(255,255,255,0.75)")
+                          annotation_position="top left" if i%2==0 else "bottom right", # Alternate
+                          annotation_font_size=10, annotation_font_color=config.COLOR_TARGET_LINE, annotation_bgcolor="rgba(255,255,255,0.75)")
 
     fig.update_layout(
-        title=dict(text=title_text, x=0.05, xanchor='left', font_size=17), # Title left-aligned for more "report" feel
+        title=dict(text=title_text, x=0.05, xanchor='left', font_size=17),
         yaxis_title=y_title_text, xaxis_title=x_title_text,
         legend_title_text="", hovermode="x unified",
-        hoverlabel=dict(bgcolor="white", font_size=11, bordercolor=config.COLOR_TEXT_SECONDARY, namelength=-1),
+        hoverlabel=dict(bgcolor="white", font_size=12, bordercolor=config.COLOR_TEXT_SECONDARY, namelength=-1),
         xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.05)', type='date',
-                   showspikes=True, spikemode='across', spikesnap='cursor', spikethickness=1, spikedash='dot', spikecolor=config.COLOR_TARGET_LINE, # Add spikes for x-axis
-                   rangeslider_visible= len(df[date_col].unique()) > 20, # Slider for many points
+                   showspikes=True, spikemode='across+marker', spikesnap='cursor', spikethickness=1, spikedash='dot', spikecolor=config.COLOR_TEXT_SECONDARY, # Crosshair effect
+                   rangeslider_visible= len(df[date_col].unique()) > 12, # More points to justify slider
                    rangeselector=dict(buttons=list([
                         dict(count=1, label="1M", step="month", stepmode="todate" if df[date_col].max() > pd.Timestamp.now() - pd.DateOffset(months=1) else "backward"),
                         dict(count=3, label="3M", step="month", stepmode="backward"), dict(count=6, label="6M", step="month", stepmode="backward"),
-                        dict(count=1, label="YTD", step="year", stepmode="todate"), dict(count=1, label="1Y", step="year", stepmode="backward"),
-                        dict(step="all")]),font_size=10, y=1.15, x=0, xanchor='left')),
-        yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickformat=y_axis_format_str),
-        legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5, font_size=10), # Legend below plot
-        margin=dict(l=50, r=30, t=60, b=100) # Increased bottom margin for legend if many items
+                        dict(count=1, label="YTD", step="year", stepmode="todate"), dict(count=1, label="1A", step="year", stepmode="backward"), # "1A" for "1 Año"
+                        dict(step="all", label=_("all_range_label", "Todo"))]), # Localize "All"
+                        font_size=10, bgcolor='rgba(220,220,220,0.5)', y=1.12, x=0.01, xanchor='left')), # Styling selector
+        yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickformat=y_axis_format_str if y_axis_format_str else None),
+        legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5, font_size=10,traceorder="normal"), # Legend below, traceorder for consistency
+        margin=dict(l=50, r=30, t=70, b=100 if len(value_cols_map)>2 else 60) # Adjust bottom margin for legend
     )
     return fig
 
-# --- Comparison Bar Chart Visualization (More "Friendly" and Actionable) ---
+# --- Comparison Bar Chart Visualization (Definitive Fix & UX Polish) ---
 def create_comparison_bar_chart(df_input: pd.DataFrame, x_col: str,
                                 y_cols_map: Dict[str, str], # {TEXT_STRING_KEY_FOR_LABEL: ACTUAL_COLUMN_NAME_IN_DF}
                                 title_key: str, lang: str,
                                 y_axis_title_key: str = "count_label", x_axis_title_key: str = "category_axis_label",
                                 barmode: str = 'group', show_total_for_stacked: bool = False,
-                                data_label_format_str: str = ".0f",
-                                add_bar_trendline: Optional[str] = None) -> go.Figure: # actual_col_name for trendline
+                                data_label_format_str: str = ".0f") -> go.Figure:
     df = df_input.copy() 
     title_text = get_lang_text(lang, title_key)
     x_title_text = get_lang_text(lang, x_axis_title_key)
     y_title_text = get_lang_text(lang, y_axis_title_key)
     
-    df_plot = df[[x_col]].copy()
-    y_cols_for_plotting_display_names = []
-    actual_y_cols_used = []
+    df_plot = df[[x_col]].copy() 
+    y_display_names_for_plotting = [] 
+    original_y_cols_for_summing = [] 
 
-    for label_k, actual_col in y_cols_map.items():
-        if actual_col in df.columns and pd.api.types.is_numeric_dtype(df[actual_col]):
-            display_n = get_lang_text(lang, label_k, actual_col.replace('_', ' ').title())
-            df_plot[display_n] = df[actual_col]
-            y_cols_for_plotting_display_names.append(display_n)
-            actual_y_cols_used.append(actual_col) # Keep track of original cols that were plotted
+    for text_key_for_legend, actual_col_name in y_cols_map.items():
+        if actual_col_name in df.columns and pd.api.types.is_numeric_dtype(df[actual_col_name]):
+            # Use localized display name for the column in the plot, which will be used for legend
+            display_name_for_plot = get_lang_text(lang, text_key_for_legend, actual_col_name.replace('_', ' ').title())
+            df_plot[display_name_for_plot] = df[actual_col_name] # Copy data to new column with display name
+            y_display_names_for_plotting.append(display_name_for_plot)
+            original_y_cols_for_summing.append(actual_col_name) # Keep original for accurate summation
 
-    if df_plot.empty or x_col not in df_plot.columns or not y_cols_for_plotting_display_names:
-        return go.Figure().update_layout(title_text=f"{title_text} ({get_lang_text(lang, 'no_data_for_selection')})",
-            annotations=[dict(text=get_lang_text(lang, 'no_data_for_selection'), showarrow=False, xref="paper", yref="paper", x=0.5, y=0.5)])
+    if df_plot.empty or x_col not in df_plot.columns or not y_display_names_for_plotting:
+        return go.Figure().update_layout(
+            title_text=f"{title_text} ({get_lang_text(lang, 'no_data_for_selection')})",
+            annotations=[dict(text=get_lang_text(lang, 'no_data_for_selection'), showarrow=False, xref="paper", yref="paper", x=0.5, y=0.5)]
+        )
 
-    fig = px.bar(df_plot, x=x_col, y=y_cols_for_plotting_display_names, title=None, barmode=barmode,
-                 color_discrete_sequence=config.COLOR_SCHEME_CATEGORICAL)
+    fig = px.bar(df_plot, x=x_col, y=y_display_names_for_plotting, # px.bar uses these names for traces/legend
+                 title=None, barmode=barmode,
+                 color_discrete_sequence=px.colors.qualitative.Pastel1 if barmode == 'stack' else config.COLOR_SCHEME_CATEGORICAL, # Softer for stack
+                 # labels here maps column names in df_plot (which are already display names) to themselves for consistency if needed
+                 labels={name: name for name in y_display_names_for_plotting} 
+                )
+
+    fmt = data_label_format_str if isinstance(data_label_format_str, str) and data_label_format_str else ".0f"
+    texttemplate_str = f'%{{y:{fmt}}}'
+    # Use %{fullData.name} which refers to the trace name (legend entry)
+    hovertemplate_str = f'<b>%{{x}}</b><br>%{{fullData.name}}: %{{y:{fmt}}}<extra></extra>'
     
-    fmt_specifier = data_label_format_str if (isinstance(data_label_format_str, str) and data_label_format_str) else ".0f"
-    text_tmpl = f'%{{y:{fmt_specifier}}}'
-    hover_tmpl = f'<b>%{{x}}</b><br>%{{fullData.name}}: %{{y:{fmt_specifier}}}<extra></extra>'
-
     fig.update_traces(
-        texttemplate=text_tmpl, textposition='outside' if barmode != 'stack' else 'inside',
-        textfont=dict(size=9, color=config.COLOR_TEXT_SECONDARY if barmode=='stack' else 'black'),
-        insidetextanchor='middle' if barmode == 'stack' else 'end', hovertemplate=hover_tmpl,
-        marker_line_width=0.5, marker_line_color='rgba(0,0,0,0.4)') # Subtle bar outline
+        texttemplate=texttemplate_str,
+        textposition='outside' if barmode != 'stack' else 'inside',
+        textfont=dict(size=9, color='rgba(0,0,0,0.7)' if barmode == 'stack' else 'black'),
+        insidetextanchor='middle' if barmode == 'stack' else 'auto',
+        hovertemplate=hovertemplate_str,
+        marker_line_width=0.8, marker_line_color='rgba(0,0,0,0.6)' # Subtle border for bars
+    )
 
-    if barmode == 'stack' and show_total_for_stacked and actual_y_cols_used: # Sum from original df cols
-        df_plot['_total_'] = df[actual_y_cols_used].sum(axis=1, numeric_only=True)
-        annotations_total = [
-            dict(x=row[x_col], y=row['_total_'], text=f"{row['_total_']:{fmt_specifier}}",
+    if barmode == 'stack' and show_total_for_stacked and y_display_names_for_plotting: # Use display names that are now columns in df_plot
+        df_plot['_total_calc_'] = df_plot[y_display_names_for_plotting].sum(axis=1, numeric_only=True)
+        annotations_stacked = [
+            dict(x=row[x_col], y=row['_total_calc_'], text=f"{row['_total_calc_']:{fmt}}",
                  font=dict(size=10, color=config.COLOR_TARGET_LINE), showarrow=False, 
                  yanchor='bottom', yshift=4, xanchor='center')
-            for _, row in df_plot.iterrows() if pd.notna(row['_total_'])
+            for _, row in df_plot.iterrows() if pd.notna(row['_total_calc_'])
         ]
-        current_annotations = list(fig.layout.annotations or [])
-        fig.update_layout(annotations=current_annotations + annotations_total)
-    
-    # Optional: Add a trendline for a specific y-column (usually for single series or primary series in group)
-    if add_bar_trendline and add_bar_trendline in y_cols_map: # add_bar_trendline is label_key
-        actual_col_for_trend = y_cols_map[add_bar_trendline]
-        # Ensure x_col can be used for OLS trendline (e.g., convert categorical months to numbers if needed)
-        if actual_col_for_trend in df_plot.columns: # Check if this col (possibly renamed) exists in df_plot
-            df_plot_trend = df_plot.copy()
-            # If x_col is categorical month names, map to numbers for trendline
-            if df_plot_trend[x_col].dtype == 'object' or pd.api.types.is_categorical_dtype(df_plot_trend[x_col]):
-                 try:
-                    month_map = {name: i for i, name in enumerate(pd.to_datetime(df_plot_trend[x_col], format='%b', errors='coerce').dt.strftime('%b').unique() if pd.notna(name))}
-                    if month_map: df_plot_trend['_x_numeric_'] = df_plot_trend[x_col].map(month_map)
-                 except: df_plot_trend['_x_numeric_'] = pd.Series(range(len(df_plot_trend))) # Fallback
-            else: df_plot_trend['_x_numeric_'] = df_plot_trend[x_col] # Assume it's numeric or date already
-
-            if '_x_numeric_' in df_plot_trend.columns and pd.api.types.is_numeric_dtype(df_plot_trend['_x_numeric_']):
-                trendline_fig = px.scatter(df_plot_trend, x='_x_numeric_', y=actual_col_for_trend,
-                                          trendline="ols", trendline_color_override=config.COLOR_TARGET_LINE)
-                if len(trendline_fig.data) > 1: # OLS line is the second trace
-                    trendline_trace = trendline_fig.data[1]
-                    trendline_trace.name = f"{get_lang_text(lang, add_bar_trendline)} Trend"
-                    trendline_trace.line.dash = 'dash'
-                    trendline_trace.showlegend = True
-                    fig.add_trace(trendline_trace)
-
+        if annotations_stacked:
+            fig.layout.annotations = list(fig.layout.annotations or []) + annotations_stacked
 
     fig.update_layout(
         title=dict(text=title_text, x=0.05, xanchor='left', font_size=16),
         yaxis_title=y_title_text, xaxis_title=x_title_text,
         legend_title_text="", hovermode="x unified",
         hoverlabel=dict(bgcolor="white", font_size=11, namelength=-1),
-        xaxis_tickangle=-30 if len(df_plot[x_col].unique()) > 6 else 0,
+        xaxis_tickangle=-30 if len(df_plot[x_col].unique()) > 7 else 0,
         legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5, font_size=9, title_text=""),
-        yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.08)'),
+        yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.08)', zerolinecolor='rgba(0,0,0,0.2)'),
         xaxis=dict(showgrid=False, type='category', linecolor='rgba(0,0,0,0.2)'),
-        bargap=0.15, margin=dict(l=50, r=20, t=50, b=80 if len(y_cols_for_plotting_display_names) > 2 else 50)
+        bargap=0.2 if barmode == 'group' else 0.1, 
+        margin=dict(l=50, r=20, t=60, b=100 if len(y_cols_map)>3 else 60) # More bottom margin for legend
     )
     return fig
 
-# --- Metric Card (UX Enhanced - Keep previous robust version) ---
+
+# --- Metric Card (UX Enhanced - Robust Version) ---
 def display_metric_card(st_object, label_key: str, value: Optional[Union[int, float, np.number]], lang: str,
                         previous_value: Optional[Union[int, float, np.number]] = None, unit: str = "",
                         higher_is_better: Optional[bool] = None, help_text_key: Optional[str] = None, 
@@ -381,100 +369,99 @@ def display_metric_card(st_object, label_key: str, value: Optional[Union[int, fl
             if (higher_is_better and val_raw_float >= float(target_value)) or \
                (not higher_is_better and val_raw_float <= float(target_value)):
                 status_icon_str = "🎯 "
-            else: status_icon_str = "" 
+            # else: status_icon_str = "" # Only show target met, not target missed via icon
         else: status_icon_str = "" 
     st_object.metric(label=status_icon_str + label_text_orig, value=val_display_str, delta=delta_text_str, delta_color=delta_color_str, help=help_text_final_str)
 
-# --- Radar Chart Visualization (UX Enhanced - keep robust previous version) ---
+
+# --- Radar Chart Visualization (UX Enhanced - keep previous good version, slight polish) ---
 def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: str, values_col: str,
                                  title_key: str, lang: str, group_col: Optional[str] = None,
                                  range_max_override: Optional[Union[int, float]] = None,
                                  target_values_map: Optional[Dict[str, Union[int, float]]] = None, 
-                                 fill_opacity: float = 0.3): # Default less opaque
+                                 fill_opacity: float = 0.3): # More transparency
     title_text = get_lang_text(lang, title_key)
     df_radar = df_radar_input.copy()
     if df_radar.empty or categories_col not in df_radar.columns or values_col not in df_radar.columns or df_radar[categories_col].nunique() == 0:
         return go.Figure().update_layout(title_text=f"{title_text} ({get_lang_text(lang, 'no_data_radar')})",
             annotations=[dict(text=get_lang_text(lang, 'no_data_radar'),showarrow=False, xref="paper", yref="paper", x=0.5,y=0.5)])
     all_categories_ordered_list = df_radar[categories_col].unique()
-    all_r_vals_radar = df_radar[values_col].dropna().tolist() # From data
-    if target_values_map: # Add target values to consider for max range
-        all_r_vals_radar.extend([v for v in target_values_map.values() if pd.notna(v) and isinstance(v,(int,float))])
+    all_r_vals_radar = df_radar[values_col].dropna().tolist() 
+    if target_values_map: all_r_vals_radar.extend([v for v in target_values_map.values() if pd.notna(v) and isinstance(v,(int,float))])
     valid_r_vals_radar = [float(v) for v in all_r_vals_radar if isinstance(v, (int,float)) and pd.notna(v)]
     max_data_val_for_radar_range = max(valid_r_vals_radar) if valid_r_vals_radar else 0.0
-    radial_range_max_final = float(range_max_override) if range_max_override is not None and pd.notna(range_max_override) else (max_data_val_for_radar_range * 1.2 if max_data_val_for_radar_range > 0 else config.ENGAGEMENT_RADAR_DIM_SCALE_MAX or 5.0)
-    radial_range_max_final = max(radial_range_max_final, 1.0) # Min range of 1
+    radial_range_max_final = float(range_max_override) if range_max_override is not None and pd.notna(range_max_override) else (max_data_val_for_radar_range * 1.25 if max_data_val_for_radar_range > 0 else config.ENGAGEMENT_RADAR_DIM_SCALE_MAX or 5.0) # Increased multiplier
+    radial_range_max_final = max(radial_range_max_final, 1.0) 
     fig = go.Figure()
-    colors_radar = config.COLOR_SCHEME_CATEGORICAL
+    colors_list = config.COLOR_SCHEME_CATEGORICAL
     if group_col and group_col in df_radar.columns and df_radar[group_col].nunique() > 0:
-        for i, (name_grp_radar, group_data_radar) in enumerate(df_radar.groupby(group_col)):
-            current_grp_ordered_radar = pd.DataFrame({categories_col: all_categories_ordered_list}).merge(
-                group_data_radar, on=categories_col, how='left').fillna({values_col: 0})
+        for i, (name_grp_radar, group_data_df) in enumerate(df_radar.groupby(group_col)):
+            current_grp_ordered_df = pd.DataFrame({categories_col: all_categories_ordered_list}).merge(
+                group_data_df, on=categories_col, how='left').fillna({values_col: 0})
             fig.add_trace(go.Scatterpolar(
-                r=current_grp_ordered_radar[values_col], theta=current_grp_ordered_radar[categories_col],
-                fill='toself', name=str(name_grp_radar), line_color=colors_radar[i % len(colors_radar)], opacity=fill_opacity,
+                r=current_grp_ordered_df[values_col], theta=current_grp_ordered_df[categories_col],
+                fill='toself', name=str(name_grp_radar), line_color=colors_list[i % len(colors_list)], opacity=fill_opacity,
                 hovertemplate='<b>%{theta}</b><br>' + f'{str(name_grp_radar)}: %{{r:.1f}}<extra></extra>' ))
     else:
-        single_series_ordered_radar = pd.DataFrame({categories_col: all_categories_ordered_list}).merge(
+        single_series_ordered_df = pd.DataFrame({categories_col: all_categories_ordered_list}).merge(
             df_radar, on=categories_col, how='left').fillna({values_col: 0})
         fig.add_trace(go.Scatterpolar(
-            r=single_series_ordered_radar[values_col], theta=single_series_ordered_radar[categories_col],
-            fill='toself', name=get_lang_text(lang, "average_score_label"), line_color=colors_radar[0],
-            opacity=fill_opacity + 0.15, hovertemplate='<b>%{theta}</b>: %{r:.1f}<extra></extra>')) # Main series slightly more opaque
+            r=single_series_ordered_df[values_col], theta=single_series_ordered_df[categories_col],
+            fill='toself', name=get_lang_text(lang, "average_score_label"), line_color=colors_list[0],
+            opacity=fill_opacity + 0.2, hovertemplate='<b>%{theta}</b>: %{r:.1f}<extra></extra>')) # Main series slightly more opaque
     if target_values_map: 
-        target_r_ordered_radar = [target_values_map.get(cat, 0) for cat in all_categories_ordered_list]
+        target_r_values_ordered = [target_values_map.get(cat, 0) for cat in all_categories_ordered_list]
         fig.add_trace(go.Scatterpolar(
-            r=target_r_ordered_radar, theta=all_categories_ordered_list, mode='lines', name=get_lang_text(lang, "target_label"),
-            line=dict(color=config.COLOR_TARGET_LINE, dash='longdash', width=2), hoverinfo='skip')) # Thicker target line
+            r=target_r_values_ordered, theta=all_categories_ordered_list, mode='lines', name=get_lang_text(lang, "target_label"),
+            line=dict(color=config.COLOR_TARGET_LINE, dash='dashdot', width=2), hoverinfo='skip')) # Dashdot for target
     fig.update_layout(
-        title=dict(text=title_text, x=0.5, font_size=16), # Slightly smaller title
-        polar=dict(bgcolor="rgba(245,245,245,0.3)", # Very light grey bg for polar area
-                   radialaxis=dict(visible=True, range=[0, radial_range_max_final], showline=True, linecolor='rgba(0,0,0,0.1)', gridcolor="rgba(0,0,0,0.1)", tickfont_size=8, angle=30, Ntickbins=5),
-                   angularaxis=dict(showline=True, linecolor='rgba(0,0,0,0.1)', gridcolor="rgba(0,0,0,0.05)", tickfont_size=9, direction="clockwise", period=len(all_categories_ordered_list))),
-        showlegend=True, legend=dict(orientation="h", yanchor="top", y=-0.1, xanchor="center", x=0.5, font_size=9, itemsizing='constant'), # Legend below, constant size
-        margin=dict(l=40, r=40, t=60, b=70), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+        title=dict(text=title_text, x=0.5, font_size=16), 
+        polar=dict(bgcolor="rgba(248,248,248,0.1)", # Very light background
+                   radialaxis=dict(visible=True, range=[0, radial_range_max_final], showline=True, linecolor='rgba(0,0,0,0.2)', gridcolor="rgba(0,0,0,0.1)", tickfont_size=8, Ntickbins=5, showtickprefix='first'),
+                   angularaxis=dict(showline=True, linecolor='rgba(0,0,0,0.2)', gridcolor="rgba(0,0,0,0.05)", tickfont_size=9, direction="clockwise", period=len(all_categories_ordered_list))),
+        showlegend=True, legend=dict(orientation="h", yanchor="top", y=-0.1, xanchor="center", x=0.5, font_size=9, itemsizing='constant'), 
+        margin=dict(l=30, r=30, t=60, b=70), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
     return fig
 
 # --- Stress Semáforo Visual (More "Friendly" and Actionable) ---
 def create_stress_semaforo_visual(stress_level_value: Optional[Union[int, float, np.number]], lang: str,
                                   scale_max: float = config.STRESS_LEVEL_PSYCHOSOCIAL["max_scale"]) -> go.Figure:
-    display_num_stress, color_for_status_stress, text_for_status_stress = None, config.COLOR_TEXT_SECONDARY, get_lang_text(lang, 'status_na_label')
+    val_for_indicator_stress, color_for_status_s, text_for_status_s = None, config.COLOR_TEXT_SECONDARY, get_lang_text(lang, 'status_na_label')
 
     if pd.notna(stress_level_value) and isinstance(stress_level_value, (int, float, np.number)):
-        val_float_s = float(stress_level_value)
-        display_num_stress = val_float_s
-        status_s = get_status_by_thresholds(val_float_s, higher_is_worse=True,
+        val_float_s_viz = float(stress_level_value)
+        val_for_indicator_stress = val_float_s_viz 
+        status_s_viz = get_status_by_thresholds(val_float_s_viz, higher_is_worse=True,
                                            threshold_good=config.STRESS_LEVEL_PSYCHOSOCIAL["low"],
                                            threshold_warning=config.STRESS_LEVEL_PSYCHOSOCIAL["medium"])
-        color_for_status_stress = get_semaforo_color(status_s)
-        if status_s == "good": text_for_status_stress = get_lang_text(lang, 'low_label')
-        elif status_s == "warning": text_for_status_stress = get_lang_text(lang, 'moderate_label')
-        elif status_s == "critical": text_for_status_stress = get_lang_text(lang, 'high_label')
-        else: text_for_status_stress = f"{val_float_s:.1f}" if pd.notna(val_float_s) else get_lang_text(lang, 'status_na_label')
+        color_for_status_s = get_semaforo_color(status_s_viz)
+        if status_s_viz == "good": text_for_status_s = get_lang_text(lang, 'low_label')
+        elif status_s_viz == "warning": text_for_status_s = get_lang_text(lang, 'moderate_label')
+        elif status_s_viz == "critical": text_for_status_s = get_lang_text(lang, 'high_label')
+        else: text_for_status_s = f"{val_float_s_viz:.1f}" if pd.notna(val_float_s_viz) else get_lang_text(lang, 'status_na_label')
             
-    num_config_s = {'font': {'size': 24, 'color': color_for_status_stress}, 'valueformat': ".1f"} # Slightly larger number
-    if display_num_stress is not None: num_config_s['suffix'] = f" / {scale_max:.0f}"
+    num_config_stress_viz = {'font': {'size': 20, 'color': color_for_status_s}, 'valueformat': ".1f"} # Slightly smaller value font
+    if val_for_indicator_stress is not None: num_config_stress_viz['suffix'] = f" / {scale_max:.0f}"
     
     fig = go.Figure(go.Indicator(
-        mode="gauge+number", value=display_num_stress, 
-        domain={'x': [0, 1], 'y': [0, 1]}, # Use full domain, adjust height in layout
-        title={'text': f"<b style='color:{color_for_status_stress}; font-size:1.15em;'>{text_for_status_stress.upper()}</b>", 
-               'font': {'size': 13}, 'align': "center"}, # Title integrated with value
-        number=num_config_s,
+        mode="gauge+number", value=val_for_indicator_stress, 
+        domain={'x': [0.0, 1.0], 'y': [0.0, 0.8]}, # Adjust domain for better title space
+        title={'text': f"<b style='color:{color_for_status_s}; font-size:1em;'>{text_for_status_s.upper()}</b>", 
+               'font': {'size': 12}, 'align': "center", 'y':0.95}, # Title for status, positioned higher
+        number=num_config_stress_viz,
         gauge={
             'shape': "bullet",
-            'axis': {'range': [0, scale_max], 'visible': True, 'showticklabels': True, 'layer': 'below traces',
+            'axis': {'range': [0, scale_max], 'visible': True, 'showticklabels': True,
                      'tickvals': [0, config.STRESS_LEVEL_PSYCHOSOCIAL["low"], config.STRESS_LEVEL_PSYCHOSOCIAL["medium"], scale_max],
                      'ticktext': ["0", f"{config.STRESS_LEVEL_PSYCHOSOCIAL['low']:.0f}", f"{config.STRESS_LEVEL_PSYCHOSOCIAL['medium']:.0f}", f"{scale_max:.0f}"],
-                     'tickfont': {'size':9, 'color': config.COLOR_TEXT_SECONDARY}, 'tickmode': 'array'},
+                     'tickfont': {'size':8, 'color': config.COLOR_TEXT_SECONDARY}, 'tickmode': 'array'},
             'steps': [ # Color bands for context
-                {'range': [0, config.STRESS_LEVEL_PSYCHOSOCIAL["low"]], 'color': config.COLOR_STATUS_GOOD},
-                {'range': [config.STRESS_LEVEL_PSYCHOSOCIAL["low"], config.STRESS_LEVEL_PSYCHOSOCIAL["medium"]], 'color': config.COLOR_STATUS_WARNING},
-                {'range': [config.STRESS_LEVEL_PSYCHOSOCIAL["medium"], scale_max], 'color': config.COLOR_STATUS_CRITICAL}
+                {'range': [0, config.STRESS_LEVEL_PSYCHOSOCIAL["low"]], 'color': "rgba(46, 204, 113, 0.3)"}, # Lighter fill for steps
+                {'range': [config.STRESS_LEVEL_PSYCHOSOCIAL["low"], config.STRESS_LEVEL_PSYCHOSOCIAL["medium"]], 'color': "rgba(241, 196, 15, 0.3)"},
+                {'range': [config.STRESS_LEVEL_PSYCHOSOCIAL["medium"], scale_max], 'color': "rgba(231, 76, 60, 0.3)"}
             ],
-            'bar': {'color': color_for_status_stress, 'thickness': 0.4, 'line':{'color':'white', 'width':1}}, # Bar showing current level, slightly thinner
-            'bgcolor': "rgba(255,255,255,0.1)", 'borderwidth': 1, 'bordercolor': "rgba(0,0,0,0.1)"
+            'bar': {'color': color_for_status_s, 'thickness': 0.4, 'line':{'color':'rgba(0,0,0,0.3)', 'width':1}}, # Thinner bar, with subtle line
+            'bgcolor': "rgba(255,255,255,0)", 'borderwidth': 0 # Fully transparent background for gauge area
         }))
-    # Compact height suitable for embedding within columns or alongside other metrics
-    fig.update_layout(height=100, margin=dict(t=25, b=25, l=15, r=15), paper_bgcolor='rgba(0,0,0,0)')
+    fig.update_layout(height=85, margin=dict(t=20, b=5, l=5, r=5), paper_bgcolor='rgba(0,0,0,0)') # More compact
     return fig
