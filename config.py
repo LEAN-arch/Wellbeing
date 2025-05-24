@@ -5,7 +5,7 @@ import pandas as pd # Not strictly needed here but often imported alongside
 # --- GENERAL APPLICATION SETTINGS ---
 APP_VERSION = "v1.0.1 (Config Fix)" # Incrementing for this fix
 APP_TITLE_KEY = "app_title" # Using a distinct key from dashboard_title for flexibility
-APP_ICON = "❤️‍🩹" # Icon reflecting wellbeing, health
+APP_ICON = "🦺" # Icon reflecting wellbeing, health
 
 # --- FILTER DEFAULTS ---
 DEFAULT_SITES = []
