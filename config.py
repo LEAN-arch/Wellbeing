@@ -24,40 +24,38 @@ COLOR_GRAY_TEXT = "#7f8c8d"       # For annotations, secondary text
 COLOR_TARGET_LINE = "#E74C3C"     # Prominent color for target lines
 
 # --- Thresholds (Adjust based on your organization's standards) ---
-# Laboral Stability
-ROTATION_RATE_LOW = 8      # Target or good
-ROTATION_RATE_MEDIUM = 15  # Warning
-ROTATION_RATE_HIGH = 20    # Critical (this is also used as the main threshold in the gauge)
+# Laboral Stability - For Rotation Rate (higher is worse)
+ROTATION_RATE_THRESHOLD_GOOD = 8      # Values <= this are "Good" (Green)
+ROTATION_RATE_THRESHOLD_WARNING = 15  # Values > GOOD and <= WARNING are "Warning" (Yellow)
+                                      # Values > WARNING are "Critical" (Red)
+# If only one critical threshold is needed for the gauge display, it could be:
+ROTATION_RATE_TARGET = 8 # Often the "good" threshold is the target
+ROTATION_RATE_CRITICAL = 20 # A specific critical point
 
-RETENTION_TARGET_HIGH = 90 # % considered good
-RETENTION_WARNING_LOW = 75 # % below which is a warning
+# Retention (higher is better)
+RETENTION_THRESHOLD_GOOD = 90     # Values >= this are "Good"
+RETENTION_THRESHOLD_WARNING = 75  # Values < GOOD and >= WARNING are "Warning"
+                                  # Values < WARNING are "Critical"
 
 # Safety Pulse
-INCIDENTS_TARGET_LOW = 1     # Ideal max incidents
-INCIDENTS_WARNING_HIGH = 5   # Warning level
+INCIDENTS_THRESHOLD_GOOD = 1       # <= 1 is good
+INCIDENTS_THRESHOLD_WARNING = 5    # > 1 and <= 5 is warning, > 5 is critical
 
-# Operational Stress
-STRESS_LEVEL_LOW = 3.5       # Low stress (good)
-STRESS_LEVEL_MEDIUM = 7.0    # Moderate stress
-STRESS_LEVEL_HIGH = 10.0     # Max value for stress scale for semaforo bar
+# Operational Stress (Scale 1-10 typically, higher is worse)
+STRESS_LEVEL_THRESHOLD_LOW = 3.5    # <= LOW is "Low Stress" (Green)
+STRESS_LEVEL_THRESHOLD_MEDIUM = 7.0 # > LOW and <= MEDIUM is "Moderate Stress" (Yellow)
+                                   # > MEDIUM is "High Stress" (Red)
+STRESS_LEVEL_MAX_SCALE = 10.0      # Max value for stress scale display
 
-# Engagement
-ENPS_TARGET_HIGH = 50        # Good eNPS
-ENPS_WARNING_LOW = 10        # Low eNPS needing attention
-CLIMATE_SCORE_TARGET_HIGH = 80 # Good climate score
-CLIMATE_SCORE_WARNING_LOW = 60 # Warning climate score
+# Engagement (Higher is better for these examples)
+ENPS_THRESHOLD_GOOD = 50
+ENPS_THRESHOLD_WARNING = 10
+CLIMATE_SCORE_THRESHOLD_GOOD = 80
+CLIMATE_SCORE_THRESHOLD_WARNING = 60
+PARTICIPATION_THRESHOLD_GOOD = 80 # e.g. Survey Participation
 
 # --- Placeholder Texts & UI Labels ---
-PLACEHOLDER_TEXT_PLANT_MAP = """
-### Interactive Facility Map
-(Placeholder: This module will visualize data spatially, such as staff distribution or risk heatmaps. Future development will focus on accessible map interactions and data presentation using libraries like Plotly Mapbox or Folium, potentially with real-time data feeds.)
-"""
-
-PLACEHOLDER_TEXT_AI_INSIGHTS = """
-### Predictive AI Insights
-(Placeholder: This module will provide forecasts on psychosocial risks (e.g., based on Human Affect & Behavior Scores), confidence bands for outlooks, and early warnings for burnout/turnover. Requires trained ML models e.g., with scikit-learn or TensorFlow.)
-"""
-
+# ... (TEXT_STRINGS remain the same as in the previous corrected version, including new keys)
 # --- Language Strings ---
 LANG = "EN" # Default language
 
@@ -114,6 +112,7 @@ TEXT_STRINGS = {
         "category_axis": "Category",
         "value_axis": "Value",
         "count_axis": "Count",
+        "days_label": "days",
         "hours_or_shifts_label": "Hours / Count",
         "average_score_label": "Average Score",
         "optional_modules_header": "Optional Modules (Future Vision)",
@@ -141,12 +140,12 @@ TEXT_STRINGS = {
         "target_label": "Target",
         "thresholds_label": "Thresholds",
         "low_label": "Low",
-        "high_label": "High",
-        "rotation_gauge_caption": "Lower rotation is generally better. Aim for below {}%.",
-        "stress_semaforo_caption": "Scale 1-10. Low: ≤{:.1f}, Moderate: >{:.1f} & ≤{:.1f}, High: >{:.1f}"
+        "high_label": "High", # Generic High
+        "rotation_gauge_caption": "Lower rotation is generally better. Green: ≤{good}%, Yellow: ≤{warn}%, Red: >{warn}%. Target: {target}%.",
+        "stress_semaforo_caption": "Scale 1-{max_scale}. Low: ≤{low:.1f}, Moderate: >{low:.1f} & ≤{medium:.1f}, High: >{medium:.1f}"
     },
     "ES": {
-        # ... (Populate with Spanish translations for all EN keys, including new ones)
+        # ... (Ensure all new keys from EN are translated here)
         "dashboard_title": "Tablero de Signos Vitales Laborales",
         "dashboard_subtitle": "Un Sistema de Inteligencia Centrado en el Humano para el Bienestar Laboral y el Rendimiento Organizacional.",
         "alignment_note": "Alineado con NOM-035, ISO 45003 y principios DEI.",
@@ -198,6 +197,7 @@ TEXT_STRINGS = {
         "category_axis": "Categoría",
         "value_axis": "Valor",
         "count_axis": "Cantidad",
+        "days_label": "días",
         "hours_or_shifts_label": "Horas / Cantidad",
         "average_score_label": "Puntuación Promedio",
         "optional_modules_header": "Módulos Opcionales (Visión Futura)",
@@ -226,18 +226,19 @@ TEXT_STRINGS = {
         "thresholds_label": "Umbrales",
         "low_label": "Bajo",
         "high_label": "Alto",
-        "rotation_gauge_caption": "Una rotación más baja es generalmente mejor. Objetivo: menos de {}%.",
-        "stress_semaforo_caption": "Escala 1-10. Bajo: ≤{:.1f}, Moderado: >{:.1f} & ≤{:.1f}, Alto: >{:.1f}"
+        "rotation_gauge_caption": "Una rotación más baja es generalmente mejor. Verde: ≤{good}%, Amarillo: ≤{warn}%, Rojo: >{warn}%. Objetivo: {target}%.",
+        "stress_semaforo_caption": "Escala 1-{max_scale}. Bajo: ≤{low:.1f}, Moderado: >{low:.1f} & ≤{medium:.1f}, Alto: >{medium:.1f}"
     }
 }
 
-# --- Data File Paths (Assuming CSVs are in the same directory as app.py) ---
+
+# --- Data File Paths ---
 STABILITY_DATA_FILE = "stability_data.csv"
 SAFETY_DATA_FILE = "safety_data.csv"
 ENGAGEMENT_DATA_FILE = "engagement_data.csv"
 STRESS_DATA_FILE = "stress_data.csv"
 
-# --- Sample Data Column Names ---
+# --- Column Names (Ensure these match your CSV headers) ---
 COLUMN_SITE = "site"
 COLUMN_REGION = "region"
 COLUMN_DEPARTMENT = "department"
@@ -258,13 +259,13 @@ COLUMN_NEAR_MISSES = "near_misses"
 COLUMN_DAYS_WITHOUT_ACCIDENTS = "days_without_accidents"
 COLUMN_ACTIVE_ALERTS = "active_alerts"
 
-ENGAGEMENT_RADAR_DATA_COLS = { # Maps internal key to actual CSV column name
+ENGAGEMENT_RADAR_DATA_COLS = {
     "initiative": "initiative",
     "punctuality": "punctuality",
     "recognition": "recognition_data",
     "feedback": "feedback_data"
 }
-ENGAGEMENT_RADAR_LABELS_KEYS = { # Maps internal key to text_strings key for label
+ENGAGEMENT_RADAR_LABELS_KEYS = {
     "initiative": "initiative_label",
     "punctuality": "punctuality_label",
     "recognition": "recognition_label",
@@ -277,6 +278,9 @@ COLUMN_RECOGNITIONS_COUNT = "recognitions_count"
 
 COLUMN_OVERTIME_HOURS = "overtime_hours"
 COLUMN_UNFILLED_SHIFTS = "unfilled_shifts"
+COLUMN_STRESS_LEVEL_SURVEY = "stress_level_survey"
+COLUMN_WORKLOAD_PERCEPTION = "workload_perception"
+COLUMN_PSYCH_SIGNAL_SCORE = "psychological_signals"
 COLUMN_STRESS_LEVEL_SURVEY = "stress_level_survey"
 COLUMN_WORKLOAD_PERCEPTION = "workload_perception"
 COLUMN_PSYCH_SIGNAL_SCORE = "psychological_signals"
