@@ -40,7 +40,7 @@ def get_semaforo_color(status: Optional[str]) -> str:
     return config.COLOR_TEXT_SECONDARY
 
 
-# --- KPI Gauge Visualization (SME Platinum Edition) ---
+# --- KPI Gauge Visualization ---
 def create_kpi_gauge(value: Optional[Union[int, float, np.number]], title_key: str, lang: str,
                      unit: str = "%", higher_is_worse: bool = True,
                      threshold_good: Optional[Union[int, float, np.number]] = None,
@@ -214,7 +214,8 @@ def create_trend_chart(df_input: pd.DataFrame, date_col: str,
     )
     return fig
 
-# --- Comparison Bar Chart Visualization (Ultra-Platinum - Final insidetextanchor fix) ---
+
+# --- Comparison Bar Chart Visualization (Ultra-Platinum - Final Attempt with insidetextanchor fix) ---
 def create_comparison_bar_chart(df_input: pd.DataFrame, x_col: str,
                                 y_cols_map: Dict[str, str], # {TEXT_STRING_KEY_FOR_LABEL: ACTUAL_COLUMN_NAME_IN_DF}
                                 title_key: str, lang: str,
@@ -226,8 +227,9 @@ def create_comparison_bar_chart(df_input: pd.DataFrame, x_col: str,
     x_title = get_lang_text(lang, x_axis_title_key)
     y_title = get_lang_text(lang, y_axis_title_key)
     
+    # 1. Identify actual y-columns to plot and prepare labels for px.bar
     actual_y_cols_for_plotting = []
-    plotly_bar_labels_arg = {} 
+    plotly_bar_labels_arg = {} # For px.bar 'labels' argument {actual_col_name: desired_legend_name}
 
     for text_key_for_legend, actual_col_name_from_map in y_cols_map.items():
         if actual_col_name_from_map in df.columns and pd.api.types.is_numeric_dtype(df[actual_col_name_from_map]):
@@ -240,46 +242,62 @@ def create_comparison_bar_chart(df_input: pd.DataFrame, x_col: str,
             annotations=[dict(text=get_lang_text(lang, 'no_data_for_selection'), showarrow=False, xref="paper", yref="paper", x=0.5, y=0.5)]
         )
     
+    # 2. Create the base figure with Plotly Express
     try:
         fig = px.bar(df, x=x_col, y=actual_y_cols_for_plotting, 
                      title=None, barmode=barmode,
                      color_discrete_sequence=px.colors.qualitative.Pastel if barmode == 'stack' else config.COLOR_SCHEME_CATEGORICAL,
-                     labels=plotly_bar_labels_arg
+                     labels=plotly_bar_labels_arg,
+                     text_auto=True # Let px handle initial text placement if possible
                     )
     except Exception as e_px:
-        return go.Figure().update_layout(title_text=f"{title_text} (Chart Error: {str(e_px)[:100]})")
+        return go.Figure().update_layout(title_text=f"{title_text} (Chart Error: {str(e_px)[:50]})") 
     
+    # 3. Safely prepare format specifier
     final_fmt_spec = data_label_format_str
     if not (isinstance(final_fmt_spec, str) and final_fmt_spec and (final_fmt_spec.startswith(".") or final_fmt_spec.startswith(","))):
         final_fmt_spec = ".0f" 
 
-    for trace in fig.data:
-        if hasattr(trace, 'type') and trace.type == 'bar':
-            trace.texttemplate = f'%{{y:{final_fmt_spec}}}'
-            trace.hovertemplate = f'<b>%{{x}}</b><br>{trace.name}: %{{y:{final_fmt_spec}}}<extra></extra>'
-            trace.textposition = 'outside' if barmode != 'stack' else 'inside'
-            if trace.textposition == 'inside':
-                trace.insidetextanchor = 'middle' # Valid values: 'start', 'middle', 'end'
-            # No 'else' needed for insidetextanchor as it's not relevant/ignored for 'outside'
-            trace.textfont = dict(size=9, color='rgba(0,0,0,0.7)' if barmode == 'stack' else 'black')
-            if hasattr(trace, 'marker') and hasattr(trace.marker, 'line'):
-                trace.marker.line.width = 0.5
-                trace.marker.line.color = 'rgba(0,0,0,0.3)'
+    # 4. Refine traces more carefully
+    for trace_obj in fig.data: # Iterate through traces created by px.bar
+        if hasattr(trace_obj, 'type') and trace_obj.type == 'bar':
+            trace_obj.texttemplate = f'%{{y:{final_fmt_spec}}}'
+            trace_obj.hovertemplate = f'<b>%{{x}}</b><br>{trace_obj.name}: %{{y:{final_fmt_spec}}}<extra></extra>' # Use trace.name
+            
+            current_text_position = 'outside' if barmode != 'stack' else 'inside'
+            trace_obj.textposition = current_text_position
+            trace_obj.textfont = dict(size=9, color=config.COLOR_TEXT_SECONDARY if current_text_position == 'inside' else 'black')
+            
+            # ** CRITICAL FIX for insidetextanchor **
+            if current_text_position == 'inside':
+                trace_obj.insidetextanchor = 'middle'  # Valid: 'start', 'middle', 'end'
+            else:
+                # If textposition is 'outside', insidetextanchor is not directly applicable.
+                # To be safe, ensure it's not set or set to a default if Plotly needs it.
+                # For most cases, not setting it when 'outside' is best.
+                if hasattr(trace_obj, 'insidetextanchor'): # Check if it exists before trying to delete (though not standard to delete)
+                    pass # Don't set it. Let Plotly use its default behavior for 'outside'.
 
+            if hasattr(trace_obj, 'marker') and hasattr(trace_obj.marker, 'line'):
+                trace_obj.marker.line.width = 0.5
+                trace_obj.marker.line.color = 'rgba(0,0,0,0.3)'
+
+    # 5. Add annotations for total of stacked bars
     if barmode == 'stack' and show_total_for_stacked and actual_y_cols_for_plotting:
-        df_total_sum_calc = df.copy() 
-        df_total_sum_calc['_total_stacked_'] = df_total_sum_calc[actual_y_cols_for_plotting].sum(axis=1, numeric_only=True)
+        df_for_total_calc = df.copy() 
+        df_for_total_calc['_total_stacked_'] = df_for_total_calc[actual_y_cols_for_plotting].sum(axis=1, numeric_only=True)
         annotations_list_total = [
             dict(x=row[x_col], y=row['_total_stacked_'], 
                  text=f"{row['_total_stacked_']:{final_fmt_spec}}",
                  font=dict(size=10, color=config.COLOR_TARGET_LINE), 
                  showarrow=False, yanchor='bottom', yshift=4, xanchor='center')
-            for _, row in df_total_sum_calc.iterrows() if pd.notna(row['_total_stacked_'])
+            for _, row in df_for_total_calc.iterrows() if pd.notna(row['_total_stacked_'])
         ]
         if annotations_list_total:
             current_layout_annotations = list(fig.layout.annotations or ())
             fig.update_layout(annotations=current_layout_annotations + annotations_list_total)
 
+    # 6. Final layout updates
     fig.update_layout(
         title=dict(text=title_text, x=0.03, y=0.97, xanchor='left', yanchor='top', font_size=16),
         yaxis_title=y_title, xaxis_title=x_title,
@@ -400,7 +418,7 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
     show_legend_final_radar = has_groups_on_radar or (target_values_map and plot_data_exists)
     fig.update_layout(
         title=dict(text=title_text, x=0.5, y=0.97, yanchor='top', font_size=16), 
-        polar=dict(bgcolor="rgba(248,248,248,0.1)", 
+        polar=dict(bgcolor="rgba(248,248,248,0.0)", 
                    radialaxis=dict(visible=True, range=[0, radial_range_max_final], showline=True, linecolor='rgba(0,0,0,0.15)', gridcolor="rgba(0,0,0,0.1)", tickfont_size=8, nticks=5, showticklabels=True, layer='below traces'),
                    angularaxis=dict(showline=True, linecolor='rgba(0,0,0,0.15)', gridcolor="rgba(0,0,0,0.05)", tickfont_size=9, direction="clockwise", showticklabels=True, layer='below traces')),
         showlegend=show_legend_final_radar, 
