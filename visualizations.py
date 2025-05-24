@@ -217,7 +217,7 @@ def create_trend_chart(df_input: pd.DataFrame, date_col: str,
 
 # --- Comparison Bar Chart Visualization (Ultra-Sure Fix for insidetextanchor) ---
 def create_comparison_bar_chart(df_input: pd.DataFrame, x_col: str,
-                                y_cols_map: Dict[str, str], # {TEXT_STRING_KEY_FOR_LABEL: ACTUAL_COLUMN_NAME_IN_DF}
+                                y_cols_map: Dict[str, str], 
                                 title_key: str, lang: str,
                                 y_axis_title_key: str = "count_label", x_axis_title_key: str = "category_axis_label",
                                 barmode: str = 'group', show_total_for_stacked: bool = False,
@@ -227,7 +227,6 @@ def create_comparison_bar_chart(df_input: pd.DataFrame, x_col: str,
     x_title = get_lang_text(lang, x_axis_title_key)
     y_title = get_lang_text(lang, y_axis_title_key)
     
-    # 1. Identify actual y-columns to plot and prepare labels for px.bar
     actual_y_cols_for_plotting = []
     plotly_bar_labels_arg = {} 
 
@@ -242,60 +241,56 @@ def create_comparison_bar_chart(df_input: pd.DataFrame, x_col: str,
             annotations=[dict(text=get_lang_text(lang, 'no_data_for_selection'), showarrow=False, xref="paper", yref="paper", x=0.5, y=0.5)]
         )
     
-    # 2. Create the base figure with Plotly Express
     try:
         fig = px.bar(df, x=x_col, y=actual_y_cols_for_plotting, 
-                     title=None, 
-                     barmode=barmode,
+                     title=None, barmode=barmode,
                      color_discrete_sequence=px.colors.qualitative.Pastel if barmode == 'stack' else config.COLOR_SCHEME_CATEGORICAL,
                      labels=plotly_bar_labels_arg,
-                     text_auto=False # Disable Plotly Express auto text, we'll set it via update_traces
+                     text_auto=False # Explicitly disable Plotly Express auto text for manual control
                     )
     except Exception as e_px:
         # print(f"PX.BAR EXCEPTION in create_comparison_bar_chart: {e_px}")
         return go.Figure().update_layout(title_text=f"{title_text} (Chart Gen Error)")
     
-    # 3. Safely prepare format specifier
     final_fmt_spec = data_label_format_str
     if not (isinstance(final_fmt_spec, str) and final_fmt_spec and (final_fmt_spec.startswith(".") or final_fmt_spec.startswith(","))):
         final_fmt_spec = ".0f" 
 
-    # 4. Update traces one by one:
+    # Update traces one by one:
     for trace in fig.data: 
         if hasattr(trace, 'type') and trace.type == 'bar':
-            current_trace_name = trace.name if trace.name else "Value" # Fallback name for hover
-            
             trace.texttemplate = f'%{{y:{final_fmt_spec}}}'
-            trace.hovertemplate = f'<b>%{{x}}</b><br>{current_trace_name}: %{{y:{final_fmt_spec}}}<extra></extra>'
+            trace_name_for_hover = trace.name if trace.name else "Value"
+            trace.hovertemplate = f'<b>%{{x}}</b><br>{trace_name_for_hover}: %{{y:{final_fmt_spec}}}<extra></extra>'
             
-            trace.textposition = 'outside' if barmode != 'stack' else 'inside'
-            trace.textfont = dict(size=9, color=config.COLOR_TEXT_SECONDARY if trace.textposition == 'inside' else 'black')
+            current_text_position = 'outside' if barmode != 'stack' else 'inside'
+            trace.textposition = current_text_position
             
-            # ** CRITICAL FIX FOR insidetextanchor: Only set if textposition is 'inside' **
-            if trace.textposition == 'inside':
-                trace.insidetextanchor = 'middle'  # Valid Plotly value
-            # For 'outside', Plotly handles anchoring by default. Do not set insidetextanchor.
+            trace.textfont = dict(size=9, color=config.COLOR_TEXT_SECONDARY if current_text_position == 'inside' else 'black')
+            
+            # ** THE CRITICAL FIX IS HERE: ONLY SET 'insidetextanchor' IF textposition is 'inside' **
+            if current_text_position == 'inside':
+                trace.insidetextanchor = 'middle'  # Valid values: 'start', 'middle', 'end'
+            # No else branch to set insidetextanchor for 'outside' text.
 
-            if hasattr(trace, 'marker') and hasattr(trace.marker, 'line'): # Defensive check
+            if hasattr(trace, 'marker') and hasattr(trace.marker, 'line'):
                 trace.marker.line.width = 0.5
                 trace.marker.line.color = 'rgba(0,0,0,0.3)'
 
-    # 5. Add annotations for total of stacked bars
     if barmode == 'stack' and show_total_for_stacked and actual_y_cols_for_plotting:
-        df_for_total_calc = df.copy() 
-        df_for_total_calc['_total_stacked_'] = df_for_total_calc[actual_y_cols_for_plotting].sum(axis=1, numeric_only=True)
+        df_total_sum_calc = df.copy() 
+        df_total_sum_calc['_total_stacked_'] = df_total_sum_calc[actual_y_cols_for_plotting].sum(axis=1, numeric_only=True)
         annotations_list_total = [
             dict(x=row[x_col], y=row['_total_stacked_'], 
                  text=f"{row['_total_stacked_']:{final_fmt_spec}}",
                  font=dict(size=10, color=config.COLOR_TARGET_LINE), 
                  showarrow=False, yanchor='bottom', yshift=4, xanchor='center')
-            for _, row in df_for_total_calc.iterrows() if pd.notna(row['_total_stacked_'])
+            for _, row in df_total_sum_calc.iterrows() if pd.notna(row['_total_stacked_'])
         ]
         if annotations_list_total:
             current_layout_annotations = list(fig.layout.annotations or ())
             fig.update_layout(annotations=current_layout_annotations + annotations_list_total)
 
-    # 6. Final layout updates
     fig.update_layout(
         title=dict(text=title_text, x=0.03, y=0.97, xanchor='left', yanchor='top', font_size=16),
         yaxis_title=y_title, xaxis_title=x_title,
@@ -453,7 +448,7 @@ def create_stress_semaforo_visual(stress_level_value: Optional[Union[int, float,
         number=num_config_s,
         gauge={
             'shape': "bullet",
-            'axis': {'range': [0, scale_max], 'visible': True, 'showticklabels': True, 'layer':'below traces',
+            'axis': {'range': [0, scale_max], 'visible': True, 'showticklabels': True, # Removed 'layer'
                      'tickvals': [0, config.STRESS_LEVEL_PSYCHOSOCIAL["low"], config.STRESS_LEVEL_PSYCHOSOCIAL["medium"], scale_max],
                      'ticktext': ["0", f"{config.STRESS_LEVEL_PSYCHOSOCIAL['low']:.1f}", 
                                   f"{config.STRESS_LEVEL_PSYCHOSOCIAL['medium']:.1f}", f"{scale_max:.0f}"],
