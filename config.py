@@ -3,13 +3,13 @@ import plotly.express as px # For accessing Plotly color scales
 
 # --- General Configuration ---
 APP_TITLE = "Laboral Vital Signs Dashboard"
-APP_ICON = "📊" #  Alternative: "❤️‍🩹", "💡", "🚀"
+APP_ICON = "📊"
 
 # --- Filter Defaults ---
 DEFAULT_SITES = []
 DEFAULT_REGIONS = []
 DEFAULT_DEPARTMENTS = []
-DEFAULT_FUNCTIONAL_CATEGORIES = [] # FC
+DEFAULT_FUNCTIONAL_CATEGORIES = []
 DEFAULT_SHIFTS = []
 
 # --- Color Palettes ---
@@ -22,11 +22,11 @@ COLOR_RED_SEMAFORO = "#E74C3C"
 COLOR_NEUTRAL_METRIC = "#3498DB"
 COLOR_GRAY_TEXT = "#7f8c8d"
 
-# --- Thresholds (Example - Adjust based on your organization's standards) ---
+# --- Thresholds ---
 ROTATION_RATE_LOW_THRESHOLD = 10
 ROTATION_RATE_HIGH_THRESHOLD = 20
-INCIDENTS_ACCEPTABLE_MAX = 5 # Max incidents per month considered "good" for visualization example
-STRESS_LEVEL_LOW_THRESHOLD = 3.5 # On a scale (e.g., 1-10)
+INCIDENTS_ACCEPTABLE_MAX = 5
+STRESS_LEVEL_LOW_THRESHOLD = 3.5
 STRESS_LEVEL_MEDIUM_THRESHOLD = 7.0
 
 # --- Placeholder Texts & UI Labels ---
@@ -40,8 +40,8 @@ PLACEHOLDER_TEXT_AI_INSIGHTS = """
 (Placeholder: This module will provide forecasts on psychosocial risks (e.g., based on Human Affect & Behavior Scores), confidence bands for outlooks, and early warnings for burnout/turnover. Requires trained ML models e.g., with scikit-learn or TensorFlow.)
 """
 
-# --- Language Strings (Basic for ES/EN MVP) ---
-LANG = "EN" # Default language
+# --- Language Strings ---
+LANG = "EN"
 
 TEXT_STRINGS = {
     "EN": {
@@ -180,21 +180,20 @@ TEXT_STRINGS = {
     }
 }
 
-# --- Data File Paths ---
-DATA_PATH = "data/"
-STABILITY_DATA_FILE = DATA_PATH + "stability_data.csv"
-SAFETY_DATA_FILE = DATA_PATH + "safety_data.csv"
-ENGAGEMENT_DATA_FILE = DATA_PATH + "engagement_data.csv"
-STRESS_DATA_FILE = DATA_PATH + "stress_data.csv"
+# --- Data File Paths (Assuming CSVs are in the same directory as app.py) ---
+STABILITY_DATA_FILE = "stability_data.csv"
+SAFETY_DATA_FILE = "safety_data.csv"
+ENGAGEMENT_DATA_FILE = "engagement_data.csv"
+STRESS_DATA_FILE = "stress_data.csv"
 
-# --- Sample Data Column Names (used for consistency and future mapping) ---
+# --- Sample Data Column Names ---
 COLUMN_SITE = "site"
 COLUMN_REGION = "region"
 COLUMN_DEPARTMENT = "department"
 COLUMN_FC = "fc"
 COLUMN_SHIFT = "shift"
-COLUMN_DATE = "date" # For time series data
-COLUMN_MONTH = "month" # For monthly aggregated data, could also be derived from 'date'
+COLUMN_DATE = "date"
+COLUMN_MONTH = "month"
 
 # Stability Data Columns
 COLUMN_ROTATION_RATE = "rotation_rate"
@@ -211,17 +210,17 @@ COLUMN_DAYS_WITHOUT_ACCIDENTS = "days_without_accidents"
 COLUMN_ACTIVE_ALERTS = "active_alerts"
 
 # Engagement Data Columns
-# For radar chart:
 ENGAGEMENT_RADAR_CATEGORIES_KEYS = {
     "initiative": "initiative_label",
     "punctuality": "punctuality_label",
-    "recognition": "recognition_label",
-    "feedback": "feedback_label" # Assumes columns named 'initiative', 'punctuality', etc. in data
+    "recognition_data": "recognition_label", # Assuming 'recognition_data' is the column name in CSV
+    "feedback_data": "feedback_label"        # Assuming 'feedback_data' is the column name in CSV
 }
+# The actual column names in the CSV for radar data points
 COLUMN_INITIATIVE = "initiative"
 COLUMN_PUNCTUALITY = "punctuality"
-COLUMN_RECOGNITION = "recognition_data" # Assuming 'recognition' might be a keyword in the CSV
-COLUMN_FEEDBACK = "feedback_data"       # Assuming 'feedback' might be a keyword in the CSV
+COLUMN_RECOGNITION = "recognition_data" # If your CSV has "recognition" use that.
+COLUMN_FEEDBACK = "feedback_data"       # If your CSV has "feedback" use that.
 # For other metrics:
 COLUMN_LABOR_CLIMATE = "labor_climate_score"
 COLUMN_ENPS = "nps"
