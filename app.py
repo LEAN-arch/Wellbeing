@@ -2,10 +2,11 @@ import streamlit as st
 import pandas as pd
 import visualizations as viz # Your custom visualization functions
 import config # Your configuration file
+import numpy as np # For isnan etc.
 
 # --- Page Configuration (Applied once at the top) ---
 initial_lang_code = config.LANG
-if 'selected_lang_code' in st.session_state: # If language has been selected already
+if 'selected_lang_code' in st.session_state:
     initial_lang_code = st.session_state.selected_lang_code
 
 st.set_page_config(
@@ -15,71 +16,71 @@ st.set_page_config(
 )
 
 # --- Language Selection ---
-st.sidebar.markdown("---") # Separator
+st.sidebar.markdown("---")
 available_langs = list(config.TEXT_STRINGS.keys())
 if 'selected_lang_code' not in st.session_state:
-    st.session_state.selected_lang_code = config.LANG # Default from config
+    st.session_state.selected_lang_code = config.LANG
 
 def update_lang():
-    st.session_state.selected_lang_code = st.session_state._lang_selector # _ to avoid direct manipulation by widget
+    st.session_state.selected_lang_code = st.session_state._lang_selector
+
+# Using HTML to put language text side-by-side within the label
+lang_label_html = f"**{config.TEXT_STRINGS['EN'].get('language_selector', 'Language')} / {config.TEXT_STRINGS['ES'].get('language_selector', 'Idioma')}**"
 
 selected_lang_code = st.sidebar.selectbox(
-    label=config.TEXT_STRINGS["EN"].get("language_selector", "Language / Idioma:") + " / " + config.TEXT_STRINGS["ES"].get("language_selector", "Idioma / Language:"),
+    label=lang_label_html, # Use HTML for label
     options=available_langs,
     index=available_langs.index(st.session_state.selected_lang_code),
-    format_func=lambda x: "English" if x == "EN" else "Español" if x == "ES" else x,
-    key="_lang_selector", # Use a private key for session state tracking
+    format_func=lambda x: "English" if x == "EN" else "Español" if x == "ES" else x, # Nicer display names
+    key="_lang_selector",
     on_change=update_lang
 )
-current_lang_texts = config.TEXT_STRINGS[st.session_state.selected_lang_code]
-
+# Get current language texts using session state value
+current_lang_texts = config.TEXT_STRINGS.get(st.session_state.selected_lang_code, config.TEXT_STRINGS["EN"]) # Fallback to EN
 
 # --- Data Loading Functions with Caching ---
+# Pass coluumn map to load_data to rename columns during loading if needed, based on config
+# But for this MVP, columns match config, so direct load is okay
 @st.cache_data
 def load_data(file_path, date_cols=None):
     try:
+        # Assumes CSV files are in the same directory as app.py
         df = pd.read_csv(file_path, parse_dates=date_cols if date_cols else False)
         for col in df.select_dtypes(include=['object']).columns:
-            if df[col].notna().any():
-                 df[col] = df[col].astype(str).str.strip()
+             if df[col].notna().any():
+                 df[col] = df[col].astype(str).str.strip() # Clean strings
         return df
     except FileNotFoundError:
-        st.error(f"Error: File '{file_path}' not found. Please ensure it's in the same directory as the application (app.py).")
+        st.error(current_lang_texts.get("error_loading_data", "Error loading data from file: {}").format(file_path) + f". Please ensure '{file_path}' is in the same directory as app.py.")
         return pd.DataFrame()
     except Exception as e:
-        st.error(f"Error loading {file_path}: {e}")
+        st.error(current_lang_texts.get("error_loading_data", "Error loading data from file: {}").format(file_path) + f" - {e}")
         return pd.DataFrame()
 
-df_stability_raw = load_data(config.STABILITY_DATA_FILE, date_cols=[config.COLUMN_DATE])
-df_safety_raw = load_data(config.SAFETY_DATA_FILE)
+
+# Use COLUMN_MAP values to load data
+df_stability_raw = load_data(config.STABILITY_DATA_FILE, date_cols=[config.COLUMN_MAP["date"]])
+df_safety_raw = load_data(config.SAFETY_DATA_FILE, date_cols=[config.COLUMN_MAP["month"]]) # If month is like 'YYYY-MM'
 df_engagement_raw = load_data(config.ENGAGEMENT_DATA_FILE)
-df_stress_raw = load_data(config.STRESS_DATA_FILE, date_cols=[config.COLUMN_DATE])
+df_stress_raw = load_data(config.STRESS_DATA_FILE, date_cols=[config.COLUMN_MAP["date"]])
 
 
 # --- Sidebar Filters ---
 st.sidebar.header(current_lang_texts.get("filters_header", "Filters"))
 
-def get_unique_options(df, column_name):
-    if not df.empty and column_name in df.columns:
+def get_unique_options(df, column_key):
+    """Gets unique sorted string options based on a column key from COLUMN_MAP."""
+    column_name = config.COLUMN_MAP.get(column_key)
+    if not df.empty and column_name and column_name in df.columns:
         return sorted(df[column_name].dropna().astype(str).unique())
     return []
 
-# Combine dataframes to get comprehensive filter options if necessary, or use a primary one
-# For simplicity, using df_stability_raw assuming it contains all dimensional values
-# or consider a separate dimensions table/file in a real scenario.
-# Here, we'll use a combined approach for robust filter options.
-all_dfs = [df for df in [df_stability_raw, df_safety_raw, df_engagement_raw, df_stress_raw] if not df.empty]
-if all_dfs:
-    combined_df_for_filters = pd.concat(all_dfs, ignore_index=True, sort=False)
-else:
-    combined_df_for_filters = pd.DataFrame() # Handle case where all dataframes are empty
-
-
-sites = get_unique_options(combined_df_for_filters, config.COLUMN_SITE)
-regions = get_unique_options(combined_df_for_filters, config.COLUMN_REGION)
-departments = get_unique_options(combined_df_for_filters, config.COLUMN_DEPARTMENT)
-fcs = get_unique_options(combined_df_for_filters, config.COLUMN_FC)
-shifts = get_unique_options(combined_df_for_filters, config.COLUMN_SHIFT)
+# Get filter options using column keys
+sites = get_unique_options(df_stability_raw, "site")
+regions = get_unique_options(df_stability_raw, "region")
+departments = get_unique_options(df_stability_raw, "department")
+fcs = get_unique_options(df_stability_raw, "fc")
+shifts = get_unique_options(df_stability_raw, "shift")
 
 selected_sites = st.sidebar.multiselect(current_lang_texts.get("select_site"), options=sites, default=config.DEFAULT_SITES)
 selected_regions = st.sidebar.multiselect(current_lang_texts.get("select_region"), options=regions, default=config.DEFAULT_REGIONS)
@@ -87,43 +88,59 @@ selected_departments = st.sidebar.multiselect(current_lang_texts.get("select_dep
 selected_fcs = st.sidebar.multiselect(current_lang_texts.get("select_fc"), options=fcs, default=config.DEFAULT_FUNCTIONAL_CATEGORIES)
 selected_shifts = st.sidebar.multiselect(current_lang_texts.get("select_shift"), options=shifts, default=config.DEFAULT_SHIFTS)
 
-
 # --- Filter DataFrames Utility ---
-def filter_dataframe_by_selections(df, current_selections):
+def filter_dataframe_by_selections(df, column_map, current_selections):
+    """Filters a DataFrame based on selections using COLUMN_MAP."""
     if df.empty:
         return df.copy()
     
     filtered_df = df.copy()
-    for col_config_key, selected_values in current_selections.items():
-        actual_col_name = getattr(config, col_config_key, None)
+    for filter_col_key, selected_values in current_selections.items():
+        actual_col_name = column_map.get(filter_col_key) # Get actual name from map
         if actual_col_name and selected_values and actual_col_name in filtered_df.columns:
-            if filtered_df[actual_col_name].dtype == 'object' or pd.api.types.is_string_dtype(filtered_df[actual_col_name]):
+             # Filter applies to the *actual* column name in the dataframe
+             if filtered_df[actual_col_name].dtype == 'object' or pd.api.types.is_string_dtype(filtered_df[actual_col_name]):
                  selected_values_str = [str(v) for v in selected_values]
                  filtered_df = filtered_df[filtered_df[actual_col_name].astype(str).isin(selected_values_str)]
-            else:
+             else: # For numerical or other types if exact match is needed
                  filtered_df = filtered_df[filtered_df[actual_col_name].isin(selected_values)]
+
     return filtered_df
 
+# Define the selection criteria based on column keys for filtering
 filter_selections_map = {
-    'COLUMN_SITE': selected_sites,
-    'COLUMN_REGION': selected_regions,
-    'COLUMN_DEPARTMENT': selected_departments,
-    'COLUMN_FC': selected_fcs,
-    'COLUMN_SHIFT': selected_shifts
+    'site': selected_sites,
+    'region': selected_regions,
+    'department': selected_departments,
+    'fc': selected_fcs,
+    'shift': selected_shifts
 }
 
-df_stability = filter_dataframe_by_selections(df_stability_raw, filter_selections_map)
-df_safety = filter_dataframe_by_selections(df_safety_raw, filter_selections_map)
-df_engagement = filter_dataframe_by_selections(df_engagement_raw, filter_selections_map)
-df_stress = filter_dataframe_by_selections(df_stress_raw, filter_selections_map)
+df_stability = filter_dataframe_by_selections(df_stability_raw, config.COLUMN_MAP, filter_selections_map)
+df_safety = filter_dataframe_by_selections(df_safety_raw, config.COLUMN_MAP, filter_selections_map)
+df_engagement = filter_dataframe_by_selections(df_engagement_raw, config.COLUMN_MAP, filter_selections_map)
+df_stress = filter_dataframe_by_selections(df_stress_raw, config.COLUMN_MAP, filter_selections_map)
+
+
+# --- Helper to get "Previous Period" data (Simplified for MVP) ---
+# In a real system, this logic would be much more sophisticated
+# (e.g., compare current month to previous month, or current quarter to previous quarter)
+# For sample data, we'll just grab some arbitrary values that could represent previous state.
+def get_previous_value(df_raw, column_key, current_filters, comparison_date=None):
+     # This needs complex logic to filter raw data for a _prior_ period matching
+     # the dimensions of the _current_ filtered data.
+     # For MVP, return None, or a fixed arbitrary value for demonstration.
+     # Returning None means delta is not shown.
+     return None # Simplest MVP implementation
 
 # --- Main Dashboard Title & Introduction ---
-st.title(current_lang_texts.get("dashboard_title"))
-st.markdown(current_lang_texts.get("dashboard_subtitle"))
-st.caption(current_lang_texts.get("alignment_note"))
+st.title(current_lang_texts.get("dashboard_title", config.APP_TITLE))
+st.markdown(current_lang_texts.get("dashboard_subtitle", "Human-Centered Intelligence System..."))
+st.caption(current_lang_texts.get("alignment_note", "Aligned with NOM-035, ISO 45003..."))
 st.markdown("---")
-st.info(current_lang_texts.get("psych_safety_note"))
+st.info(current_lang_texts.get("psych_safety_note", config.TEXT_STRINGS["EN"]["psych_safety_note"])) # Use config directly as fallback
 st.markdown("---")
+
 
 # --- CORE MODULES ---
 
@@ -132,8 +149,14 @@ st.header(current_lang_texts.get("stability_panel_title"))
 if not df_stability.empty:
     metric_cols = st.columns(4)
 
-    avg_rotation = df_stability[config.COLUMN_ROTATION_RATE].mean() if config.COLUMN_ROTATION_RATE in df_stability.columns else float('nan')
+    # Rotation Rate Gauge & Metric Card
+    rotation_col = config.COLUMN_MAP["rotation_rate"]
+    avg_rotation = df_stability[rotation_col].mean() if rotation_col in df_stability.columns else float('nan')
+    # Add dummy previous value for demo delta
+    prev_avg_rotation = avg_rotation + np.random.uniform(-5, 5) if pd.notna(avg_rotation) else None
+
     with metric_cols[0]:
+        # Gauge - showing status
         st.plotly_chart(viz.create_kpi_gauge(
             value=avg_rotation,
             title_key="rotation_rate_gauge",
@@ -142,180 +165,261 @@ if not df_stability.empty:
             higher_is_worse=True,
             threshold_good=config.ROTATION_RATE_THRESHOLD_GOOD,
             threshold_warning=config.ROTATION_RATE_THRESHOLD_WARNING,
-            # threshold_critical implicitly defined by warning
-            target_line_value=config.ROTATION_RATE_TARGET
+            target_line_value=config.ROTATION_RATE_TARGET,
+            previous_value=prev_avg_rotation # Pass dummy previous value
         ), use_container_width=True)
-        rotation_caption = current_lang_texts.get("rotation_gauge_caption").format(
-            good=config.ROTATION_RATE_THRESHOLD_GOOD,
-            warn=config.ROTATION_RATE_THRESHOLD_WARNING,
-            target=config.ROTATION_RATE_TARGET
-        )
-        st.caption(rotation_caption)
+
+        # Use metric card to also show delta and potential icon
+        viz.display_metric_card(st, "rotation_rate_gauge", avg_rotation, lang=st.session_state.selected_lang_code,
+                               unit="%", higher_is_better=False, target_value=config.ROTATION_RATE_TARGET, # For target line on card if desired
+                               threshold_good=config.ROTATION_RATE_THRESHOLD_GOOD, threshold_warning=config.ROTATION_RATE_THRESHOLD_WARNING,
+                               previous_value=prev_avg_rotation) # Use gauge title key for metric card label
+
+    # Retention Metrics (Cards only for space)
+    ret_6m_col = config.COLUMN_MAP["retention_6m"]
+    ret_12m_col = config.COLUMN_MAP["retention_12m"]
+    ret_18m_col = config.COLUMN_MAP["retention_18m"]
+    
+    ret_6m = df_stability[ret_6m_col].mean() if ret_6m_col in df_stability.columns else float('nan')
+    ret_12m = df_stability[ret_12m_col].mean() if ret_12m_col in df_stability.columns else float('nan')
+    ret_18m = df_stability[ret_18m_col].mean() if ret_18m_col in df_stability.columns else float('nan')
+
+    # Add dummy previous retention values for demo
+    prev_ret_6m = ret_6m + np.random.uniform(-2, 2) if pd.notna(ret_6m) else None
+    prev_ret_12m = ret_12m + np.random.uniform(-3, 3) if pd.notna(ret_12m) else None
+    prev_ret_18m = ret_18m + np.random.uniform(-4, 4) if pd.notna(ret_18m) else None
+
 
     with metric_cols[1]:
-        ret_6m = df_stability[config.COLUMN_RETENTION_6M].mean() if config.COLUMN_RETENTION_6M in df_stability.columns else float('nan')
-        viz.display_metric_card(st, "retention_6m", ret_6m, lang=st.session_state.selected_lang_code, unit="%", higher_is_better=True, target_value=config.RETENTION_THRESHOLD_GOOD, lower_threshold=config.RETENTION_THRESHOLD_WARNING)
-
+        viz.display_metric_card(st, "retention_6m_metric", ret_6m, lang=st.session_state.selected_lang_code, unit="%", higher_is_better=True,
+                               target_value=config.RETENTION_THRESHOLD_GOOD, threshold_warning=config.RETENTION_THRESHOLD_WARNING,
+                               previous_value=prev_ret_6m) # Pass dummy previous
     with metric_cols[2]:
-        ret_12m = df_stability[config.COLUMN_RETENTION_12M].mean() if config.COLUMN_RETENTION_12M in df_stability.columns else float('nan')
-        viz.display_metric_card(st, "retention_12m", ret_12m, lang=st.session_state.selected_lang_code, unit="%", higher_is_better=True, target_value=config.RETENTION_THRESHOLD_GOOD, lower_threshold=config.RETENTION_THRESHOLD_WARNING)
-
+        viz.display_metric_card(st, "retention_12m_metric", ret_12m, lang=st.session_state.selected_lang_code, unit="%", higher_is_better=True,
+                               target_value=config.RETENTION_THRESHOLD_GOOD, threshold_warning=config.RETENTION_THRESHOLD_WARNING,
+                               previous_value=prev_ret_12m) # Pass dummy previous
     with metric_cols[3]:
-        ret_18m = df_stability[config.COLUMN_RETENTION_18M].mean() if config.COLUMN_RETENTION_18M in df_stability.columns else float('nan')
-        viz.display_metric_card(st, "retention_18m", ret_18m, lang=st.session_state.selected_lang_code, unit="%", higher_is_better=True, target_value=config.RETENTION_THRESHOLD_GOOD, lower_threshold=config.RETENTION_THRESHOLD_WARNING)
+        viz.display_metric_card(st, "retention_18m_metric", ret_18m, lang=st.session_state.selected_lang_code, unit="%", higher_is_better=True,
+                               target_value=config.RETENTION_THRESHOLD_GOOD, threshold_warning=config.RETENTION_THRESHOLD_WARNING,
+                               previous_value=prev_ret_18m) # Pass dummy previous
 
-    st.markdown("---") # Separator before the trend chart
+    st.markdown("---")
 
-    if config.COLUMN_DATE in df_stability.columns and \
-       config.COLUMN_HIRES in df_stability.columns and \
-       config.COLUMN_EXITS in df_stability.columns:
+    # Historical trend of hires vs. exits
+    date_col = config.COLUMN_MAP["date"]
+    hires_col = config.COLUMN_MAP["hires"]
+    exits_col = config.COLUMN_MAP["exits"]
+
+    if date_col in df_stability.columns and \
+       hires_col in df_stability.columns and \
+       exits_col in df_stability.columns:
         
         stability_trend_df = df_stability.copy()
-        if not pd.api.types.is_datetime64_any_dtype(stability_trend_df[config.COLUMN_DATE]):
-            stability_trend_df[config.COLUMN_DATE] = pd.to_datetime(stability_trend_df[config.COLUMN_DATE], errors='coerce')
-        stability_trend_df = stability_trend_df.dropna(subset=[config.COLUMN_DATE])
+        if not pd.api.types.is_datetime64_any_dtype(stability_trend_df[date_col]):
+            stability_trend_df[date_col] = pd.to_datetime(stability_trend_df[date_col], errors='coerce')
+        stability_trend_df = stability_trend_df.dropna(subset=[date_col])
 
         if not stability_trend_df.empty:
-            hires_exits_trend = stability_trend_df.groupby(pd.Grouper(key=config.COLUMN_DATE, freq='M')).agg(
-                Hires=(config.COLUMN_HIRES, 'sum'),
-                Exits=(config.COLUMN_EXITS, 'sum')
+            # Group by month for the trend
+            hires_exits_trend = stability_trend_df.groupby(pd.Grouper(key=date_col, freq='M')).agg(
+                Hires=(hires_col, 'sum'), # Use aliases matching labels/series names
+                Exits=(exits_col, 'sum')
             ).reset_index()
+
+            # Add placeholder for target values map if targets for hires/exits exist
+            # e.g., hires_targets = {'Hires': 15, 'Exits': 5} # You would define this
+            hires_exits_targets = {} # Placeholder - No targets in config for these yet
+
+            # Units for hovertemplate
+            units = {'Hires': 'people', 'Exits': 'people'} # Define units for hover
+
             st.plotly_chart(viz.create_trend_chart(
-                hires_exits_trend, config.COLUMN_DATE, ['Hires', 'Exits'],
-                "hires_vs_exits_chart", lang=st.session_state.selected_lang_code,
-                y_axis_title_key="count_axis", x_axis_title_key="month_axis",
-                show_average_line=True
+                hires_exits_trend, date_col, ['Hires', 'Exits'], # Use alias names
+                "hires_vs_exits_chart_title", lang=st.session_state.selected_lang_code,
+                y_axis_title_key="people_count_label", x_axis_title_key="month_axis_label",
+                show_average_line=True,
+                target_value_map=hires_exits_targets,
+                rolling_avg_window=3, # Example: show 3-month rolling average
+                value_col_units=units # Pass units for hover
             ), use_container_width=True)
         else:
             st.warning(current_lang_texts.get("no_data_hires_exits"))
     else:
         st.warning(current_lang_texts.get("no_data_hires_exits"))
-else:
-    st.info(current_lang_texts.get("no_data_available"))
 st.markdown("---")
 
 
 # 2. Safety Pulse Module
 st.header(current_lang_texts.get("safety_pulse_title"))
 if not df_safety.empty:
-    col1, col2, col3 = st.columns(3)
+    chart_col, metrics_col1, metrics_col2 = st.columns([2, 1, 1]) # Chart takes more space
 
-    with col1:
-        if config.COLUMN_MONTH in df_safety.columns and \
-           config.COLUMN_INCIDENTS in df_safety.columns and \
-           (config.COLUMN_NEAR_MISSES in df_safety.columns): # Near misses are optional
+    # Monthly bar graph of incidents & near misses
+    month_col = config.COLUMN_MAP["month"]
+    incidents_col = config.COLUMN_MAP["incidents"]
+    near_misses_col = config.COLUMN_MAP["near_misses"]
 
-            y_cols_safety = [config.COLUMN_INCIDENTS]
-            if config.COLUMN_NEAR_MISSES in df_safety.columns:
-                y_cols_safety.append(config.COLUMN_NEAR_MISSES)
 
-            safety_summary = df_safety.groupby(config.COLUMN_MONTH, as_index=False).agg(
-                {col: 'sum' for col in y_cols_safety} # Dynamically sum available columns
-            )
-            try:
-                month_order = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-                temp_month_dt = pd.to_datetime(safety_summary[config.COLUMN_MONTH].astype(str), format='%b', errors='coerce')
-                if not temp_month_dt.isnull().all(): # if any converted successfully
-                    safety_summary['month_dt_sorter'] = temp_month_dt
-                    safety_summary = safety_summary.sort_values('month_dt_sorter').drop(columns=['month_dt_sorter'])
-                else: # Fallback if '%b' doesn't work, try full month name or sort as is
-                    try:
-                        safety_summary[config.COLUMN_MONTH] = pd.Categorical(safety_summary[config.COLUMN_MONTH], categories=month_order, ordered=True)
-                        safety_summary = safety_summary.sort_values(config.COLUMN_MONTH)
-                    except:
-                        safety_summary = safety_summary.sort_values(by=config.COLUMN_MONTH, errors='ignore')
-            except Exception:
-                safety_summary = safety_summary.sort_values(by=config.COLUMN_MONTH, errors='ignore')
+    with chart_col: # Chart column
+        if month_col in df_safety.columns and incidents_col in df_safety.columns and \
+           (near_misses_col in df_safety.columns):
+
+            y_cols_safety_present = [col for col in [incidents_col, near_misses_col] if col in df_safety.columns]
             
+            safety_summary = df_safety.groupby(month_col, as_index=False).agg(
+                {col: 'sum' for col in y_cols_safety_present}
+            )
+            # Improve Month Sorting
+            try:
+                safety_summary[month_col] = pd.Categorical(safety_summary[month_col], categories=["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], ordered=True)
+                safety_summary = safety_summary.sort_values(month_col)
+            except Exception: # Fallback
+                 safety_summary = safety_summary.sort_values(by=month_col, errors='ignore')
+
             st.plotly_chart(viz.create_comparison_bar_chart(
-                safety_summary, config.COLUMN_MONTH, y_cols_safety,
-                "monthly_incidents_chart", lang=st.session_state.selected_lang_code,
-                x_axis_title_key="month_axis", y_axis_title_key="count_axis", barmode='stack'
+                safety_summary, month_col, y_cols_safety_present, # Use present columns
+                "monthly_incidents_chart_title", lang=st.session_state.selected_lang_code,
+                x_axis_title_key="month_axis_label", y_axis_title_key="count_label",
+                barmode='stack', # Stack incidents and near misses
+                show_total_for_stacked=True # Show total safety events per month
             ), use_container_width=True)
         else:
             st.warning(current_lang_texts.get("no_data_incidents_near_misses"))
 
-    with col2:
-        days_no_accidents = df_safety[config.COLUMN_DAYS_WITHOUT_ACCIDENTS].max() if config.COLUMN_DAYS_WITHOUT_ACCIDENTS in df_safety.columns else "N/A"
-        viz.display_metric_card(st, "days_without_accidents_metric", days_no_accidents, lang=st.session_state.selected_lang_code, unit=" " + current_lang_texts.get("days_label", "days"), higher_is_better=True)
+    # KPI Cards: Days Without Accidents & Active Safety Alerts
+    days_no_accidents_col = config.COLUMN_MAP["days_without_accidents"]
+    active_alerts_col = config.COLUMN_MAP["active_alerts"]
 
-    with col3:
-        active_alerts_count = df_safety[config.COLUMN_ACTIVE_ALERTS].sum() if config.COLUMN_ACTIVE_ALERTS in df_safety.columns else "N/A"
-        viz.display_metric_card(st, "active_safety_alerts_metric", active_alerts_count, lang=st.session_state.selected_lang_code, higher_is_better=False, target_value=0) # Target is 0 alerts
+    # Dummy previous values for metrics
+    prev_days_no_accidents = 145 # Example fixed previous
+    prev_active_alerts = 3 # Example fixed previous
+
+    with metrics_col1:
+        days_no_accidents = df_safety[days_no_accidents_col].max() if days_no_accidents_col in df_safety.columns else "N/A"
+        viz.display_metric_card(st, "days_without_accidents_metric", days_no_accidents, lang=st.session_state.selected_lang_code,
+                               unit=" " + current_lang_texts.get("days_label", "days"), higher_is_better=True,
+                               threshold_good=200, threshold_warning=100, # Example thresholds
+                               previous_value=prev_days_no_accidents) # Pass dummy previous
+
+    with metrics_col2:
+        active_alerts_count = df_safety[active_alerts_col].sum() if active_alerts_col in df_safety.columns else "N/A"
+        viz.display_metric_card(st, "active_safety_alerts_metric", active_alerts_count, lang=st.session_state.selected_lang_code,
+                               higher_is_better=False, target_value=0, # Target 0
+                               threshold_good=0, threshold_warning=1, # Good is 0, warning if >0
+                               previous_value=prev_active_alerts) # Pass dummy previous
 else:
     st.info(current_lang_texts.get("no_data_available"))
 st.markdown("---")
 
-
 # 3. Employee Engagement & Commitment
 st.header(current_lang_texts.get("engagement_title"))
 if not df_engagement.empty:
-    col1, col2 = st.columns([2,1]) # Radar larger
+    col1, col2 = st.columns([3,2]) # Radar chart larger
 
-    with col1:
+    with col1: # Radar chart
         radar_data_list = []
-        radar_categories_present = [] # Keep track of categories with data
-        # Example radar target values (on a 1-5 scale)
-        radar_target_values = {"Initiative": 4.0, "Punctuality": 4.5, "Recognition": 3.8, "Feedback Culture": 4.2}
-        # Translate target keys if needed
-        localized_radar_target_values = {
-            current_lang_texts.get(config.ENGAGEMENT_RADAR_LABELS_KEYS[k], k.title()): v 
-            for k,v in radar_target_values.items() if k in config.ENGAGEMENT_RADAR_LABELS_KEYS
-        }
+        radar_categories_present_localized = []
 
+        # Map config radar data keys to the actual column names present in the dataframe
+        actual_radar_cols = {k: v for k, v in config.COLUMN_MAP.items() if k in config.ENGAGEMENT_RADAR_DATA_COLS.keys() and v in df_engagement.columns}
 
-        for internal_key, data_col_name in config.ENGAGEMENT_RADAR_DATA_COLS.items():
-            if data_col_name in df_engagement.columns:
+        if actual_radar_cols:
+             for internal_key, data_col_name in actual_radar_cols.items():
                 avg_val = df_engagement[data_col_name].mean()
                 label_key = config.ENGAGEMENT_RADAR_LABELS_KEYS.get(internal_key, data_col_name)
                 display_label = current_lang_texts.get(label_key, data_col_name.replace('_data','').replace('_',' ').title())
                 
+                # Only add if value is meaningful
                 if pd.notna(avg_val):
                     radar_data_list.append({
                         "Dimension": display_label,
                         "Score": avg_val
                     })
-                    radar_categories_present.append(display_label)
-        
+                    radar_categories_present_localized.append(display_label)
+
         if radar_data_list:
             df_radar = pd.DataFrame(radar_data_list)
-            # Filter target values for only present categories to avoid plotting issues
-            filtered_radar_targets = {k:v for k,v in localized_radar_target_values.items() if k in radar_categories_present}
+
+            # Define radar target values for the localized dimension labels
+            # You'll need to define these based on what a good score is for each dimension on its scale (assuming 1-5)
+            engagement_targets = {
+                 current_lang_texts.get(config.ENGAGEMENT_RADAR_LABELS_KEYS['initiative'], 'Initiative'): 4.0,
+                 current_lang_texts.get(config.ENGAGEMENT_RADAR_LABELS_KEYS['punctuality'], 'Punctuality'): 4.5,
+                 current_lang_texts.get(config.ENGAGEMENT_RADAR_LABELS_KEYS['recognition'], 'Recognition'): 4.0,
+                 current_lang_texts.get(config.ENGAGEMENT_RADAR_LABELS_KEYS['feedback'], 'Feedback Culture'): 4.2,
+            }
+            # Filter targets to only include dimensions actually present in the filtered data
+            filtered_radar_targets = {k:v for k,v in engagement_targets.items() if k in radar_categories_present_localized}
 
             st.plotly_chart(viz.create_enhanced_radar_chart(
                 df_radar, "Dimension", "Score",
-                "engagement_dimensions_radar", lang=st.session_state.selected_lang_code,
-                range_max_override=5, # Assuming a 1-5 scale
-                target_values=filtered_radar_targets
+                "engagement_dimensions_radar_title", lang=st.session_state.selected_lang_code,
+                range_max_override=5, # Assuming a 1-5 scale for all dimensions
+                target_values_map=filtered_radar_targets # Pass the targets
             ), use_container_width=True)
-        else:
+        elif actual_radar_cols: # Columns were found in data but filtered/aggregated to be empty/NA
+             st.warning(current_lang_texts.get("no_data_radar"))
+        else: # Required columns for radar not even found in raw data
             st.warning(current_lang_texts.get("no_data_radar_columns"))
 
-    with col2:
-        climate_score = df_engagement[config.COLUMN_LABOR_CLIMATE].mean() if config.COLUMN_LABOR_CLIMATE in df_engagement.columns else float('nan')
-        viz.display_metric_card(st, "labor_climate_score_metric", climate_score, lang=st.session_state.selected_lang_code, unit="", higher_is_better=True, target_value=config.CLIMATE_SCORE_THRESHOLD_GOOD, lower_threshold=config.CLIMATE_SCORE_THRESHOLD_WARNING)
 
-        nps = df_engagement[config.COLUMN_ENPS].mean() if config.COLUMN_ENPS in df_engagement.columns else float('nan')
-        viz.display_metric_card(st, "enps_metric", nps, lang=st.session_state.selected_lang_code, unit="", higher_is_better=True, target_value=config.ENPS_THRESHOLD_GOOD, lower_threshold=config.ENPS_THRESHOLD_WARNING)
+    with col2: # Metric Cards
+        climate_col = config.COLUMN_MAP["labor_climate_score"]
+        nps_col = config.COLUMN_MAP["enps_score"]
+        participation_col = config.COLUMN_MAP["participation_rate"]
+        recognitions_col = config.COLUMN_MAP["recognitions_count"]
 
-        participation = df_engagement[config.COLUMN_PARTICIPATION].mean() if config.COLUMN_PARTICIPATION in df_engagement.columns else float('nan')
-        viz.display_metric_card(st, "survey_participation_metric", participation, lang=st.session_state.selected_lang_code, unit="%", higher_is_better=True, target_value=config.PARTICIPATION_THRESHOLD_GOOD)
+        climate_score = df_engagement[climate_col].mean() if climate_col in df_engagement.columns else float('nan')
+        nps = df_engagement[nps_col].mean() if nps_col in df_engagement.columns else float('nan')
+        participation = df_engagement[participation_col].mean() if participation_col in df_engagement.columns else float('nan')
+        recognitions = df_engagement[recognitions_col].sum() if recognitions_col in df_engagement.columns else float('nan')
+
+        # Dummy previous values for metrics
+        prev_climate_score = climate_score + np.random.uniform(-10, 10) if pd.notna(climate_score) else None
+        prev_nps = nps + np.random.uniform(-10, 10) if pd.notna(nps) else None
+        prev_participation = participation + np.random.uniform(-5, 5) if pd.notna(participation) else None
+        prev_recognitions = recognitions + np.random.uniform(-5, 5) if pd.notna(recognitions) else None
+
+
+        viz.display_metric_card(st, "labor_climate_score_metric", climate_score, lang=st.session_state.selected_lang_code,
+                                unit="", higher_is_better=True, target_value=config.CLIMATE_SCORE_THRESHOLD_GOOD,
+                                threshold_warning=config.CLIMATE_SCORE_THRESHOLD_WARNING, previous_value=prev_climate_score)
+
+        viz.display_metric_card(st, "enps_metric", nps, lang=st.session_state.selected_lang_code,
+                                unit="", higher_is_better=True, target_value=config.ENPS_THRESHOLD_GOOD,
+                                threshold_warning=config.ENPS_THRESHOLD_WARNING, previous_value=prev_nps)
+
+        viz.display_metric_card(st, "survey_participation_metric", participation, lang=st.session_state.selected_lang_code,
+                                unit="%", higher_is_better=True, target_value=config.PARTICIPATION_THRESHOLD_GOOD,
+                                previous_value=prev_participation)
         
-        recognitions = df_engagement[config.COLUMN_RECOGNITIONS_COUNT].sum() if config.COLUMN_RECOGNITIONS_COUNT in df_engagement.columns else float('nan')
-        viz.display_metric_card(st, "recognitions_count_metric", recognitions, lang=st.session_state.selected_lang_code, unit="", higher_is_better=True)
+        viz.display_metric_card(st, "recognitions_count_metric", recognitions, lang=st.session_state.selected_lang_code,
+                                unit="", higher_is_better=True,
+                                previous_value=prev_recognitions) # No specific thresholds for count, higher is always better
 else:
     st.info(current_lang_texts.get("no_data_available"))
 st.markdown("---")
 
+
 # 4. Operational Stress Dashboard
 st.header(current_lang_texts.get("stress_title"))
 if not df_stress.empty:
-    col1, col2 = st.columns([2,1]) # Bar chart | Semaforo + Trend
+    stress_gauge_col, shift_load_chart_col = st.columns([1, 2]) # Gauge then bar chart
 
-    with col1:
+    stress_level_col = config.COLUMN_MAP["stress_level_survey"]
+    overtime_col = config.COLUMN_MAP["overtime_hours"]
+    unfilled_shifts_col = config.COLUMN_MAP["unfilled_shifts"]
+    date_col = config.COLUMN_MAP["date"]
+    workload_col = config.COLUMN_MAP["workload_perception"]
+    psych_col = config.COLUMN_MAP["psychological_signals"]
+
+
+    with stress_gauge_col:
         st.subheader(current_lang_texts.get("overall_stress_indicator_title"))
-        avg_stress_level = df_stress[config.COLUMN_STRESS_LEVEL_SURVEY].mean() if config.COLUMN_STRESS_LEVEL_SURVEY in df_stress.columns else float('nan')
-        st.plotly_chart(viz.create_stress_semaforo_visual(avg_stress_level, lang=st.session_state.selected_lang_code), use_container_width=True)
+        avg_stress_level = df_stress[stress_level_col].mean() if stress_level_col in df_stress.columns else float('nan')
+        st.plotly_chart(viz.create_stress_semaforo_visual(
+            avg_stress_level, lang=st.session_state.selected_lang_code
+        ), use_container_width=True)
         stress_caption = current_lang_texts.get("stress_semaforo_caption").format(
                 max_scale=config.STRESS_LEVEL_MAX_SCALE,
                 low=config.STRESS_LEVEL_THRESHOLD_LOW,
@@ -323,73 +427,68 @@ if not df_stress.empty:
         )
         st.caption(stress_caption)
 
-    with col2:
-        if config.COLUMN_DATE in df_stress.columns and \
-           config.COLUMN_OVERTIME_HOURS in df_stress.columns and \
-           config.COLUMN_UNFILLED_SHIFTS in df_stress.columns:
+
+    with shift_load_chart_col: # Shift Load Chart
+        if date_col in df_stress.columns and overtime_col in df_stress.columns and unfilled_shifts_col in df_stress.columns:
             
             stress_trend_df = df_stress.copy()
-            if not pd.api.types.is_datetime64_any_dtype(stress_trend_df[config.COLUMN_DATE]):
-                stress_trend_df[config.COLUMN_DATE] = pd.to_datetime(stress_trend_df[config.COLUMN_DATE], errors='coerce')
-            stress_trend_df = stress_trend_df.dropna(subset=[config.COLUMN_DATE])
+            if not pd.api.types.is_datetime64_any_dtype(stress_trend_df[date_col]):
+                stress_trend_df[date_col] = pd.to_datetime(stress_trend_df[date_col], errors='coerce')
+            stress_trend_df = stress_trend_df.dropna(subset=[date_col])
             
             if not stress_trend_df.empty:
-                stress_summary_monthly = stress_trend_df.groupby(pd.Grouper(key=config.COLUMN_DATE, freq='M')).agg(
-                    Overtime=(config.COLUMN_OVERTIME_HOURS, 'sum'),
-                    Unfilled_Shifts=(config.COLUMN_UNFILLED_SHIFTS, 'sum')
+                # Group by month for the bar chart
+                stress_summary_monthly = stress_trend_df.groupby(pd.Grouper(key=date_col, freq='M')).agg(
+                    Overtime=(overtime_col, 'sum'), # Use alias names for series
+                    Unfilled_Shifts=(unfilled_shifts_col, 'sum')
                 ).reset_index()
-                # Localize y-column names for the chart labels dictionary
-                y_col_labels_stress = {
-                    'Overtime': current_lang_texts.get('overtime_label', 'Overtime'),
-                    'Unfilled_Shifts': current_lang_texts.get('unfilled_shifts_label', 'Unfilled Shifts')
-                }
                 
-                fig_shift_load = px.bar(stress_summary_monthly, x=config.COLUMN_DATE, y=['Overtime', 'Unfilled_Shifts'],
-                                        title=current_lang_texts.get("monthly_shift_load_chart"), barmode='group',
-                                        color_discrete_sequence=config.COLOR_SCHEME_CATEGORICAL, labels=y_col_labels_stress,
-                                        text_auto=True)
-                fig_shift_load.update_traces(texttemplate='%{y:.0f}', textposition='outside')
-                fig_shift_load.update_layout(
-                    yaxis_title=current_lang_texts.get("hours_or_shifts_label"),
-                    xaxis_title=current_lang_texts.get("month_axis"),
-                    legend_title_text=current_lang_texts.get("metrics_legend"),
-                    hovermode="x unified",
-                    xaxis_tickangle=-30,
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                    yaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(200,200,200,0.5)'),
-                    xaxis=dict(showgrid=False)
-                )
-                st.plotly_chart(fig_shift_load, use_container_width=True)
+                st.plotly_chart(viz.create_comparison_bar_chart(
+                    stress_summary_monthly, date_col, ['Overtime', 'Unfilled_Shifts'],
+                    "monthly_shift_load_chart_title", lang=st.session_state.selected_lang_code,
+                    x_axis_title_key="month_axis_label", y_axis_title_key="hours_or_shifts_label",
+                    barmode='group', # Grouped for direct comparison per month
+                    text_auto_format='.0f' # Show as whole numbers
+                ), use_container_width=True)
             else:
                 st.warning(current_lang_texts.get("no_data_shift_load"))
         else:
             st.warning(current_lang_texts.get("no_data_shift_load"))
 
-    # Workload trends vs. psychological signals (Full width below the two columns)
-    if config.COLUMN_DATE in df_stress.columns and \
-       config.COLUMN_WORKLOAD_PERCEPTION in df_stress.columns and \
-       config.COLUMN_PSYCH_SIGNAL_SCORE in df_stress.columns:
+    st.markdown("---") # Separator below the two columns before the trend chart
+
+    # Workload trends vs. psychological signals (Full width below)
+    if date_col in df_stress.columns and workload_col in df_stress.columns and psych_col in df_stress.columns:
 
         workload_psych_df = df_stress.copy()
-        if not pd.api.types.is_datetime64_any_dtype(workload_psych_df[config.COLUMN_DATE]):
-            workload_psych_df[config.COLUMN_DATE] = pd.to_datetime(workload_psych_df[config.COLUMN_DATE], errors='coerce')
-        workload_psych_df = workload_psych_df.dropna(subset=[config.COLUMN_DATE])
+        if not pd.api.types.is_datetime64_any_dtype(workload_psych_df[date_col]):
+            workload_psych_df[date_col] = pd.to_datetime(workload_psych_df[date_col], errors='coerce')
+        workload_psych_df = workload_psych_df.dropna(subset=[date_col])
 
         if not workload_psych_df.empty:
-            workload_psych_trend = workload_psych_df.groupby(pd.Grouper(key=config.COLUMN_DATE, freq='M')).agg(
-                Workload_Perception=(config.COLUMN_WORKLOAD_PERCEPTION, 'mean'),
-                Psychological_Signals=(config.COLUMN_PSYCH_SIGNAL_SCORE, 'mean')
+            # Group by month/week for trend
+            workload_psych_trend = workload_psych_df.groupby(pd.Grouper(key=date_col, freq='W')).agg( # Group by week for potentially more detail
+                Workload_Perception=(workload_col, 'mean'),
+                Psychological_Signals=(psych_col, 'mean')
             ).reset_index()
+
+            # Define dummy targets for stress trends if needed
+            # e.g. trend_targets = {'Workload_Perception': 6.0, 'Psychological_Signals': 5.5} # assuming scale is 1-10
+            trend_targets = {} # Placeholder - No targets in config yet
+
             st.plotly_chart(viz.create_trend_chart(
-                workload_psych_trend, config.COLUMN_DATE, ['Workload_Perception', 'Psychological_Signals'],
-                "workload_vs_psych_chart", lang=st.session_state.selected_lang_code,
-                x_axis_title_key="month_axis", y_axis_title_key="average_score_label",
-                show_average_line=True
+                workload_psych_trend, date_col, ['Workload_Perception', 'Psychological_Signals'],
+                "workload_vs_psych_chart_title", lang=st.session_state.selected_lang_code,
+                x_axis_title_key="date_time_axis_label", y_axis_title_key="average_score_label", # Adjust y-axis label
+                show_average_line=True,
+                target_value_map=trend_targets,
+                rolling_avg_window=4 # Example: 4-week rolling average
             ), use_container_width=True)
         else:
             st.warning(current_lang_texts.get("no_data_workload_psych"))
     else:
         st.warning(current_lang_texts.get("no_data_workload_psych"))
+
 else:
     st.info(current_lang_texts.get("no_data_available"))
 st.markdown("---")
@@ -398,25 +497,29 @@ st.markdown("---")
 # 5. Interactive Plant Map (Placeholder)
 st.header(current_lang_texts.get("plant_map_title"))
 st.markdown(config.PLACEHOLDER_TEXT_PLANT_MAP, unsafe_allow_html=True)
-st.warning("This feature requires significant additional development including mapping libraries (e.g., Plotly Mapbox, Folium) and potentially real-time data integration. Accessibility for map interactions will need careful design to ensure usability for all.")
+st.warning("This module is a placeholder for future development.") # Simpler warning for UI consistency
 st.markdown("---")
+
 
 # 6. Predictive AI Insights (Placeholder)
 st.header(current_lang_texts.get("ai_insights_title"))
 st.markdown(config.PLACEHOLDER_TEXT_AI_INSIGHTS, unsafe_allow_html=True)
-st.warning("This feature requires data science expertise, model development (e.g., scikit-learn, TensorFlow), and robust data pipelines. Ensuring fairness, transparency, and ethical considerations in AI outputs is critical.")
+st.warning("This module is a placeholder for future development.") # Simpler warning
 st.markdown("---")
+
 
 # --- Optional & Strategic Modules ---
 st.sidebar.markdown("---")
 st.sidebar.markdown(f"## {current_lang_texts.get('optional_modules_header')}")
-if st.sidebar.checkbox(current_lang_texts.get('show_optional_modules')):
-    with st.expander(current_lang_texts.get('optional_modules_title'), expanded=False):
-        st.markdown(current_lang_texts.get('optional_modules_list'))
+# Using a check box + expander to keep the sidebar clean by default
+show_optional = st.sidebar.checkbox(current_lang_texts.get('show_optional_modules', "Show Planned Modules"))
+if show_optional:
+    st.header(current_lang_texts.get('optional_modules_title', "Planned Modules"))
+    with st.expander(current_lang_texts.get('optional_modules_title'), expanded=show_optional): # Expanded based on checkbox state
+        st.markdown(current_lang_texts.get('optional_modules_list', config.TEXT_STRINGS["EN"]["optional_modules_list"])) # Fallback to EN
 
 st.sidebar.markdown("---")
-st.sidebar.caption(f"{current_lang_texts.get('dashboard_title')} v0.3.1 (MVP - Viz Refined)")
+# Version and build info
+st.sidebar.caption(f"{current_lang_texts.get('dashboard_title')} v0.4.0 (MVP - Viz Finalized)")
 st.sidebar.caption("Built with Streamlit, Plotly, and Pandas.")
-st.sidebar.markdown("---")
-st.sidebar.caption(f"{current_lang_texts.get('dashboard_title')} v0.3.0 (MVP - Viz Enhanced)")
-st.sidebar.caption("Built with Streamlit, Plotly, and Pandas.")
+st.sidebar.caption("Data Last Updated: (N/A for sample data)") # Add real timestamp later
