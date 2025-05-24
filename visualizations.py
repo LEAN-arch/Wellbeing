@@ -5,46 +5,126 @@ import pandas as pd
 import numpy as np
 import config
 
+# ... (all other functions from the previous complete working version - KEEP THEM AS IS) ...
+
 # --- Helper to get localized text ---
 def get_lang_text(lang_code, key, default_text=""):
     """Retrieves localized text safely."""
     text_dict = config.TEXT_STRINGS.get(lang_code, config.TEXT_STRINGS["EN"]) # Fallback to EN
     return text_dict.get(key, default_text)
 
-# --- Helper for getting correct status text based on thresholds ---
-def get_status_by_thresholds(value, higher_is_worse, threshold_good=None, threshold_warning=None):
-    """Determines 'good', 'warning', 'critical' status based on value and thresholds."""
-    if pd.isna(value) or value is None:
-        return None
+# --- Enhanced Comparison Bar Chart (Further Refinement for Templates) ---
+def create_comparison_bar_chart(df_input, x_col, y_cols_map, title_key, lang, # y_cols_map: {'Series Name Key': 'actual_col_name'}
+                                y_axis_title_key="count_axis_label", x_axis_title_key="category_axis_label",
+                                barmode='group', show_total_for_stacked=False, data_label_format_str=".0f"):
+    df = df_input.copy()
+    lang_texts = config.TEXT_STRINGS.get(lang, config.TEXT_STRINGS["EN"])
+    title_text = get_lang_text(lang, title_key, title_key)
+    x_title_text = get_lang_text(lang, x_axis_title_key, "Category")
+    y_title_text = get_lang_text(lang, y_axis_title_key, "Count")
 
-    val_float = float(value)
-    good_thresh = float(threshold_good) if threshold_good is not None and pd.notna(threshold_good) else None
-    warn_thresh = float(threshold_warning) if threshold_warning is not None and pd.notna(threshold_warning) else None
+    # Prepare DataFrame for Plotly Express by renaming columns to their desired display names for the legend
+    df_for_plot = df.copy()
+    y_display_names_for_px = []
+    actual_to_display_map = {}
 
-    if higher_is_worse:
-        if good_thresh is not None and val_float <= good_thresh: return "good"
-        if warn_thresh is not None and val_float <= warn_thresh:
-            if good_thresh is None or val_float > good_thresh:
-                return "warning"
-        if (warn_thresh is not None and val_float > warn_thresh) or \
-           (warn_thresh is None and good_thresh is not None and val_float > good_thresh):
-            return "critical"
-    else:
-        if good_thresh is not None and val_float >= good_thresh: return "good"
-        if warn_thresh is not None and val_float >= warn_thresh:
-             if good_thresh is None or val_float < good_thresh:
-                return "warning"
-        if (warn_thresh is not None and val_float < warn_thresh) or \
-           (warn_thresh is None and good_thresh is not None and val_float < good_thresh):
-            return "critical"
-    return None
+    valid_y_cols_map = {}
+    for series_key, actual_col_name in y_cols_map.items():
+        if actual_col_name in df.columns and pd.api.types.is_numeric_dtype(df[actual_col_name]):
+            valid_y_cols_map[series_key] = actual_col_name
 
-def get_semaforo_color(status):
-    """Maps status string to configured color."""
-    if status == "good": return config.COLOR_GREEN_SEMAFORO
-    if status == "warning": return config.COLOR_YELLOW_SEMAFORO
-    if status == "critical": return config.COLOR_RED_SEMAFORO
-    return config.COLOR_GRAY_TEXT
+    if df_for_plot.empty or x_col not in df_for_plot.columns or not valid_y_cols_map:
+        return go.Figure().update_layout(
+            title_text=f"{title_text} ({lang_texts.get('no_data_for_selection', 'No data')})",
+            annotations=[dict(text=lang_texts.get('no_data_for_selection', 'No data'), showarrow=False, xref="paper", yref="paper", x=0.5, y=0.5, font_size=12)]
+        )
+
+    for series_key, actual_col_name in valid_y_cols_map.items():
+        display_name = get_lang_text(lang, series_key, actual_col_name.replace('_', ' ').title())
+        if display_name != actual_col_name: # Only add to rename map if names are different
+            actual_to_display_map[actual_col_name] = display_name
+        y_display_names_for_px.append(display_name)
+    
+    df_for_plot.rename(columns=actual_to_display_map, inplace=True)
+
+    # Ensure the list of y-columns for px.bar actually exists in the renamed df_for_plot
+    y_final_plot_cols = [name for name in y_display_names_for_px if name in df_for_plot.columns]
+    if not y_final_plot_cols:
+         return go.Figure().update_layout(title_text=f"{title_text} ({lang_texts.get('no_data_for_selection', 'No data')})",
+                                          annotations=[dict(text=lang_texts.get('no_data_for_selection', 'No data'), showarrow=False, xref="paper", yref="paper", x=0.5, y=0.5, font_size=12)])
+
+    fig = px.bar(df_for_plot, x=x_col, y=y_final_plot_cols, # Use final list of y-columns
+                 title=None, barmode=barmode,
+                 color_discrete_sequence=config.COLOR_SCHEME_CATEGORICAL)
+
+    # Validate data_label_format_str, ensure it's a string and typical format
+    # Common formats: ".0f", ",.0f", ".1%", ".2s"
+    current_format_spec = data_label_format_str
+    if not (isinstance(current_format_spec, str) and current_format_spec and (current_format_spec.startswith('.') or current_format_spec.startswith(','))):
+        current_format_spec = ".0f" # Default to simple integer if format is strange
+
+    # Simpler hovertemplate initially for debugging, then add formatting
+    # hover_template_str = "<b>%{x}</b><br>%{fullData.name}: %{y}<extra></extra>" # Simplest
+    hover_template_str = f"<b>%{{x}}</b><br>%{{fullData.name}}: %{{y:{current_format_spec}}}<extra></extra>"
+    text_template_str = f'%{{y:{current_format_spec}}}'
+
+    # This update_traces can be sensitive.
+    try:
+        fig.update_traces(
+            texttemplate=text_template_str,
+            textposition='outside' if barmode != 'stack' else 'inside',
+            textfont_size=9,
+            insidetextanchor='middle' if barmode == 'stack' else 'auto',
+            hovertemplate=hover_template_str,
+            selector=dict(type='bar') # Apply to all bar traces
+        )
+    except Exception as e:
+        print(f"Error during fig.update_traces in create_comparison_bar_chart: {e}")
+        # Fallback to a very simple hovertemplate if the formatted one fails
+        fig.update_traces(
+             hovertemplate="<b>%{x}</b><br>%{fullData.name}: %{y}<extra></extra>",
+             selector=dict(type='bar')
+        )
+
+
+    if barmode == 'stack' and show_total_for_stacked and y_final_plot_cols:
+        # Ensure the columns used for sum exist in df_for_plot (they should be y_final_plot_cols)
+        df_for_plot['_total_stacked_'] = df_for_plot[y_final_plot_cols].sum(axis=1)
+        annotations = []
+        for _, row in df_for_plot.iterrows():
+            x_val = row[x_col]
+            total_val = row['_total_stacked_']
+            if pd.notna(total_val):
+                 annotations.append(dict(
+                                    x=x_val, y=total_val,
+                                    text=f"{total_val:{current_format_spec}}",
+                                    font=dict(size=10, color=config.COLOR_GRAY_TEXT),
+                                    showarrow=False, yanchor='bottom', yshift=3, xanchor='center'
+                                    ))
+        if annotations: fig.update_layout(annotations=annotations)
+
+    fig.update_layout(
+        title=dict(text=title_text, x=0.5, font_size=18),
+        yaxis_title=y_title_text,
+        xaxis_title=x_title_text,
+        legend_title_text=get_lang_text(lang, "metrics_legend", "Metrics"),
+        hovermode="x unified",
+        hoverlabel=dict(bgcolor="white", font_size=12, namelength=-1),
+        xaxis_tickangle=-30 if not df_for_plot.empty and df_for_plot[x_col].nunique() > 6 else 0,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(size=9)),
+        yaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(200,200,200,0.3)'),
+        xaxis=dict(showgrid=False, type='category')
+    )
+    return fig
+
+#
+# --- Other visualization functions (create_kpi_gauge, create_trend_chart, etc.) ---
+# --- Paste the rest of the previously working visualizations.py content here ---
+#
+
+# --- Helper for getting correct status text based on thresholds (already included above if this is part of full file) ---
+# def get_status_by_thresholds ...
+# def get_semaforo_color ...
 
 # --- Enhanced KPI Gauge ---
 def create_kpi_gauge(value, title_key, lang, unit="%", higher_is_worse=True,
@@ -126,7 +206,6 @@ def create_trend_chart(df_input, date_col, value_cols_map, title_key, lang,
     title_text = get_lang_text(lang, title_key, title_key)
     x_title_text = get_lang_text(lang, x_axis_title_key, "Date/Time")
     y_title_text = get_lang_text(lang, y_axis_title_key, "Value")
-
     if df.empty or date_col not in df.columns or not value_cols_map:
         return go.Figure().update_layout(
             title_text=f"{title_text} ({lang_texts.get('no_data_for_selection', 'No data')})",
@@ -199,86 +278,6 @@ def create_trend_chart(df_input, date_col, value_cols_map, title_key, lang,
         margin=dict(l=60, r=30, t=90, b=30))
     return fig
 
-# --- Enhanced Comparison Bar Chart (Corrected) ---
-def create_comparison_bar_chart(df_input, x_col, y_cols_map, title_key, lang,
-                                y_axis_title_key="count_axis_label", x_axis_title_key="category_axis_label",
-                                barmode='group', show_total_for_stacked=False, data_label_format_str=".0f"):
-    df = df_input.copy()
-    lang_texts = config.TEXT_STRINGS.get(lang, config.TEXT_STRINGS["EN"])
-    title_text = get_lang_text(lang, title_key, title_key)
-    x_title_text = get_lang_text(lang, x_axis_title_key, "Category")
-    y_title_text = get_lang_text(lang, y_axis_title_key, "Count")
-
-    # Prepare DataFrame for Plotly Express by renaming columns to their desired display names for the legend
-    df_for_plot = df.copy()
-    y_display_names_for_px = [] # This list will contain the names px.bar will use (localized)
-    # This map helps to select original data for aggregation but use display names for plotting
-    actual_to_display_map = {} 
-
-    for series_key, actual_col_name in y_cols_map.items():
-        if actual_col_name in df.columns and pd.api.types.is_numeric_dtype(df[actual_col_name]):
-            display_name = get_lang_text(lang, series_key, actual_col_name.replace('_', ' ').title())
-            # If display_name is different from actual_col_name, we'll need to rename
-            if display_name != actual_col_name:
-                actual_to_display_map[actual_col_name] = display_name
-            y_display_names_for_px.append(display_name) # Use the name that will be in df_for_plot
-    
-    df_for_plot.rename(columns=actual_to_display_map, inplace=True)
-
-    # Ensure all y_display_names_for_px exist in df_for_plot and are numeric
-    y_display_names_final = [name for name in y_display_names_for_px if name in df_for_plot.columns and pd.api.types.is_numeric_dtype(df_for_plot[name])]
-
-
-    if df_for_plot.empty or x_col not in df_for_plot.columns or not y_display_names_final:
-        return go.Figure().update_layout(
-            title_text=f"{title_text} ({lang_texts.get('no_data_for_selection', 'No data')})",
-            annotations=[dict(text=lang_texts.get('no_data_for_selection', 'No data'), showarrow=False, xref="paper", yref="paper", x=0.5, y=0.5, font_size=12)]
-        )
-    
-    fig = px.bar(df_for_plot, x=x_col, y=y_display_names_final, title=None, barmode=barmode,
-                 color_discrete_sequence=config.COLOR_SCHEME_CATEGORICAL,
-                 # labels will be automatically generated from y_display_names_final
-                 )
-
-    safe_format_spec = data_label_format_str if isinstance(data_label_format_str, str) and data_label_format_str else ".0f"
-
-    fig.update_traces(
-        texttemplate=f'%{{y:{safe_format_spec}}}',
-        textposition='outside' if barmode != 'stack' else 'inside',
-        textfont_size=9,
-        insidetextanchor='middle' if barmode == 'stack' else 'auto',
-        hovertemplate=f'<b>%{{x}}</b><br>%{{fullData.name}}: %{{y:{safe_format_spec}}}<extra></extra>', # %{fullData.name} is legend entry
-        selector=dict(type='bar')
-    )
-
-    if barmode == 'stack' and show_total_for_stacked and y_display_names_final:
-        df_for_plot['_total_stacked_'] = df_for_plot[y_display_names_final].sum(axis=1)
-        annotations = []
-        for _, row in df_for_plot.iterrows():
-            x_val = row[x_col]
-            total_val = row['_total_stacked_']
-            if pd.notna(total_val):
-                 annotations.append(dict(
-                                    x=x_val, y=total_val,
-                                    text=f"{total_val:{safe_format_spec}}", # Apply format
-                                    font=dict(size=10, color=config.COLOR_GRAY_TEXT),
-                                    showarrow=False, yanchor='bottom', yshift=3, xanchor='center'
-                                    ))
-        if annotations: fig.update_layout(annotations=annotations)
-
-    fig.update_layout(
-        title=dict(text=title_text, x=0.5, font_size=18),
-        yaxis_title=y_title_text,
-        xaxis_title=x_title_text,
-        legend_title_text=get_lang_text(lang, "metrics_legend", "Metrics"),
-        hovermode="x unified",
-        hoverlabel=dict(bgcolor="white", font_size=12, namelength=-1),
-        xaxis_tickangle=-30 if not df_for_plot.empty and len(df_for_plot[x_col].unique()) > 6 else 0,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(size=9)),
-        yaxis=dict(showgrid=True, gridwidth=1, gridcolor='rgba(200,200,200,0.3)'),
-        xaxis=dict(showgrid=False, type='category')
-    )
-    return fig
 
 # --- Enhanced Metric Card ---
 def display_metric_card(st_object, label_key, value, lang,
@@ -341,7 +340,7 @@ def create_enhanced_radar_chart(df_radar_input, categories_col, values_col, titl
     if df_radar.empty or categories_col not in df_radar.columns or values_col not in df_radar.columns or df_radar[categories_col].nunique() == 0:
         return go.Figure().update_layout(
             title_text=f"{title_text} ({lang_texts.get('no_data_radar', 'No data')})",
-            annotations=[dict(text=lang_texts.get('no_data_radar', 'No data for radar chart'), showarrow=False, xref="paper", yref="paper", x=0.5, y=0.5, font_size=12)]
+            annotations=[dict(text=lang_texts.get('no_data_radar', 'No data'), showarrow=False, xref="paper", yref="paper", x=0.5, y=0.5, font_size=12)]
         )
     all_categories_ordered = df_radar[categories_col].unique()
     all_r_values_for_range = df_radar[values_col].dropna().tolist()
@@ -398,7 +397,6 @@ def create_stress_semaforo_visual(stress_level, lang, scale_max=config.STRESS_LE
     semaforo_color = config.COLOR_GRAY_TEXT
     status_text = get_lang_text(lang, 'stress_na', 'N/A')
     display_number_indicator = None
-
     if pd.notna(raw_value_for_status) and isinstance(raw_value_for_status, (int, float, np.number)):
         val_for_gauge_bar = float(raw_value_for_status)
         display_number_indicator = float(raw_value_for_status)
@@ -411,13 +409,13 @@ def create_stress_semaforo_visual(stress_level, lang, scale_max=config.STRESS_LE
         else: status_text = f"{get_lang_text(lang, 'value_axis_label')}: {val_for_gauge_bar:.1f}"; semaforo_color = config.COLOR_GRAY_TEXT
     else:
         val_for_gauge_bar = 0.0
-    gauge_bar_clamped = max(0.0, min(float(scale_max), val_for_gauge_bar)) if pd.notna(val_for_gauge_bar) else 0.0
-    
+    # gauge_bar_clamped = max(0.0, min(float(scale_max), val_for_gauge_bar)) if pd.notna(val_for_gauge_bar) else 0.0 # This clamping is implicitly handled by gauge.axis.range for display
+
     number_config = {
         'font': {'size': 22, 'color': semaforo_color},
-        'valueformat': ".1f" # Format for the displayed number
+        'valueformat': ".1f"
     }
-    if display_number_indicator is not None: # Only add suffix if there's a number to show
+    if display_number_indicator is not None:
         number_config['suffix'] = f" / {scale_max:.0f}"
     
     fig = go.Figure(go.Indicator(
@@ -438,9 +436,7 @@ def create_stress_semaforo_visual(stress_level, lang, scale_max=config.STRESS_LE
                 {'range': [config.STRESS_LEVEL_THRESHOLD_LOW, config.STRESS_LEVEL_THRESHOLD_MEDIUM], 'color': config.COLOR_YELLOW_SEMAFORO},
                 {'range': [config.STRESS_LEVEL_THRESHOLD_MEDIUM, scale_max], 'color': config.COLOR_RED_SEMAFORO}
             ],
-            # The bar value for positioning. Let Indicator's 'value' prop control this internally based on what we feed it.
-            # The 'bar.color' is more for visual cue matching status if steps aren't enough.
-            'bar': {'color': semaforo_color if pd.notna(display_number_indicator) else config.COLOR_GRAY_TEXT, 'thickness': 0.6},
+            'bar': {'color': semaforo_color if pd.notna(display_number_indicator) else 'rgba(128,128,128,0.5)', 'thickness': 0.6},
             'bgcolor': "rgba(255,255,255,0.8)", 'borderwidth': 1, 'bordercolor': "lightgray"
         }))
     fig.update_layout(height=110, margin=dict(t=15, b=15, l=10, r=10), paper_bgcolor='rgba(0,0,0,0)')
