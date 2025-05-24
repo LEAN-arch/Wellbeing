@@ -123,7 +123,7 @@ Commit your changes (git commit -m 'Add some YourAmazingFeature').
 Push to the branch (git push origin feature/YourAmazingFeature).
 Open a Pull Request.
 📄 License
-This project is licensed under the MIT License - see the LICENSE file for details (To be created if you choose to add one).
+______
 🙏 Acknowledgements (Optional)
 Inspiration for data points (NOM-035, ISO 45003, DEI principles).
 Open-source libraries used (Streamlit, Pandas, Plotly).
