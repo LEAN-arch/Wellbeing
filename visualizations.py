@@ -214,7 +214,8 @@ def create_trend_chart(df_input: pd.DataFrame, date_col: str,
     )
     return fig
 
-# --- Comparison Bar Chart Visualization (Final Fix for insidetextanchor) ---
+
+# --- Comparison Bar Chart Visualization (Ultra-Sure Fix for insidetextanchor) ---
 def create_comparison_bar_chart(df_input: pd.DataFrame, x_col: str,
                                 y_cols_map: Dict[str, str], # {TEXT_STRING_KEY_FOR_LABEL: ACTUAL_COLUMN_NAME_IN_DF}
                                 title_key: str, lang: str,
@@ -226,6 +227,7 @@ def create_comparison_bar_chart(df_input: pd.DataFrame, x_col: str,
     x_title = get_lang_text(lang, x_axis_title_key)
     y_title = get_lang_text(lang, y_axis_title_key)
     
+    # 1. Identify actual y-columns to plot and prepare labels for px.bar
     actual_y_cols_for_plotting = []
     plotly_bar_labels_arg = {} 
 
@@ -240,47 +242,45 @@ def create_comparison_bar_chart(df_input: pd.DataFrame, x_col: str,
             annotations=[dict(text=get_lang_text(lang, 'no_data_for_selection'), showarrow=False, xref="paper", yref="paper", x=0.5, y=0.5)]
         )
     
+    # 2. Create the base figure with Plotly Express
     try:
         fig = px.bar(df, x=x_col, y=actual_y_cols_for_plotting, 
-                     title=None, barmode=barmode,
+                     title=None, 
+                     barmode=barmode,
                      color_discrete_sequence=px.colors.qualitative.Pastel if barmode == 'stack' else config.COLOR_SCHEME_CATEGORICAL,
                      labels=plotly_bar_labels_arg,
-                     text_auto=True # Enable auto text from px.bar initially
+                     text_auto=False # Disable Plotly Express auto text, we'll set it via update_traces
                     )
     except Exception as e_px:
-        # print(f"PX.BAR EXCEPTION: {e_px}") # For local debugging
-        return go.Figure().update_layout(title_text=f"{title_text} (Chart Gen Error: {str(e_px)[:50]})")
+        # print(f"PX.BAR EXCEPTION in create_comparison_bar_chart: {e_px}")
+        return go.Figure().update_layout(title_text=f"{title_text} (Chart Gen Error)")
     
+    # 3. Safely prepare format specifier
     final_fmt_spec = data_label_format_str
     if not (isinstance(final_fmt_spec, str) and final_fmt_spec and (final_fmt_spec.startswith(".") or final_fmt_spec.startswith(","))):
         final_fmt_spec = ".0f" 
 
-    # Refine traces created by px.bar
-    for trace in fig.data:
+    # 4. Update traces one by one:
+    for trace in fig.data: 
         if hasattr(trace, 'type') and trace.type == 'bar':
+            current_trace_name = trace.name if trace.name else "Value" # Fallback name for hover
+            
             trace.texttemplate = f'%{{y:{final_fmt_spec}}}'
-            # Ensure trace.name is available and used correctly. px.bar sets trace.name from the 'y' column or its mapping in 'labels'.
-            current_trace_name = trace.name if trace.name else "Value" # Fallback trace name
             trace.hovertemplate = f'<b>%{{x}}</b><br>{current_trace_name}: %{{y:{final_fmt_spec}}}<extra></extra>'
             
             trace.textposition = 'outside' if barmode != 'stack' else 'inside'
-            trace.textfont = dict(size=9, color=config.COLOR_TEXT_SECONDARY if barmode == 'stack' else 'black')
+            trace.textfont = dict(size=9, color=config.COLOR_TEXT_SECONDARY if trace.textposition == 'inside' else 'black')
             
-            # **** CRITICAL FIX for insidetextanchor: ONLY set if textposition is 'inside' ****
+            # ** CRITICAL FIX FOR insidetextanchor: Only set if textposition is 'inside' **
             if trace.textposition == 'inside':
-                trace.insidetextanchor = 'middle'  # Valid values: 'start', 'middle', 'end'
-            elif hasattr(trace, 'insidetextanchor'):
-                # If not 'inside', it's safer to let Plotly handle default or remove if it was set to something invalid.
-                # However, deleting attributes can be tricky. Omitting 'else' branch is safer here.
-                # If a trace object previously had an 'insidetextanchor' from a default, it might persist.
-                # Best practice: Do not set insidetextanchor if textposition is not 'inside'.
-                # For this attempt, we only set it when 'inside'.
-                pass
+                trace.insidetextanchor = 'middle'  # Valid Plotly value
+            # For 'outside', Plotly handles anchoring by default. Do not set insidetextanchor.
 
-            if hasattr(trace, 'marker') and hasattr(trace.marker, 'line'):
+            if hasattr(trace, 'marker') and hasattr(trace.marker, 'line'): # Defensive check
                 trace.marker.line.width = 0.5
                 trace.marker.line.color = 'rgba(0,0,0,0.3)'
 
+    # 5. Add annotations for total of stacked bars
     if barmode == 'stack' and show_total_for_stacked and actual_y_cols_for_plotting:
         df_for_total_calc = df.copy() 
         df_for_total_calc['_total_stacked_'] = df_for_total_calc[actual_y_cols_for_plotting].sum(axis=1, numeric_only=True)
@@ -295,6 +295,7 @@ def create_comparison_bar_chart(df_input: pd.DataFrame, x_col: str,
             current_layout_annotations = list(fig.layout.annotations or ())
             fig.update_layout(annotations=current_layout_annotations + annotations_list_total)
 
+    # 6. Final layout updates
     fig.update_layout(
         title=dict(text=title_text, x=0.03, y=0.97, xanchor='left', yanchor='top', font_size=16),
         yaxis_title=y_title, xaxis_title=x_title,
