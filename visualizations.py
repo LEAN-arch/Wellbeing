@@ -214,8 +214,7 @@ def create_trend_chart(df_input: pd.DataFrame, date_col: str,
     )
     return fig
 
-
-# --- Comparison Bar Chart Visualization (SME Platinum - Final Attempt for insidetextanchor) ---
+# --- Comparison Bar Chart Visualization (Ultra-Platinum - Final insidetextanchor fix) ---
 def create_comparison_bar_chart(df_input: pd.DataFrame, x_col: str,
                                 y_cols_map: Dict[str, str], # {TEXT_STRING_KEY_FOR_LABEL: ACTUAL_COLUMN_NAME_IN_DF}
                                 title_key: str, lang: str,
@@ -242,56 +241,44 @@ def create_comparison_bar_chart(df_input: pd.DataFrame, x_col: str,
         )
     
     try:
-        fig = px.bar(df, x=x_col, y=actual_y_cols_for_plotting,
-                     title=None, 
-                     barmode=barmode,
-                     color_discrete_sequence=px.colors.qualitative.Pastel2 if barmode == 'stack' else config.COLOR_SCHEME_CATEGORICAL,
+        fig = px.bar(df, x=x_col, y=actual_y_cols_for_plotting, 
+                     title=None, barmode=barmode,
+                     color_discrete_sequence=px.colors.qualitative.Pastel if barmode == 'stack' else config.COLOR_SCHEME_CATEGORICAL,
                      labels=plotly_bar_labels_arg
                     )
     except Exception as e_px:
-        return go.Figure().update_layout(title_text=f"{title_text} (Chart Error: {str(e_px)[:100]})") # Show part of error
+        return go.Figure().update_layout(title_text=f"{title_text} (Chart Error: {str(e_px)[:100]})")
     
     final_fmt_spec = data_label_format_str
     if not (isinstance(final_fmt_spec, str) and final_fmt_spec and (final_fmt_spec.startswith(".") or final_fmt_spec.startswith(","))):
         final_fmt_spec = ".0f" 
 
-    # Update traces carefully
-    for trace_obj in fig.data: # fig.data contains the traces created by px.bar
-        if hasattr(trace_obj, 'type') and trace_obj.type == 'bar':
-            # Set texttemplate using the value from the trace ('y')
-            trace_obj.texttemplate = f'%{{y:{final_fmt_spec}}}'
-            # Hovertemplate uses 'x', 'name' (from legend/label), and 'y'
-            trace_obj.hovertemplate = f'<b>%{{x}}</b><br>{trace_obj.name}: %{{y:{final_fmt_spec}}}<extra></extra>'
-            
-            # Set text position
-            trace_obj.textposition = 'outside' if barmode != 'stack' else 'inside'
-            
-            # Set insidetextanchor ONLY if textposition is 'inside', and use a VALID value
-            if trace_obj.textposition == 'inside':
-                trace_obj.insidetextanchor = 'middle' 
-            # No need to set insidetextanchor if textposition is 'outside', Plotly handles it.
-            
-            trace_obj.textfont = dict(size=9, color='rgba(0,0,0,0.7)' if barmode == 'stack' else 'black')
-            
-            if hasattr(trace_obj, 'marker') and hasattr(trace_obj.marker, 'line'): # Check for marker attribute
-                trace_obj.marker.line.width = 0.5
-                trace_obj.marker.line.color = 'rgba(0,0,0,0.3)'
+    for trace in fig.data:
+        if hasattr(trace, 'type') and trace.type == 'bar':
+            trace.texttemplate = f'%{{y:{final_fmt_spec}}}'
+            trace.hovertemplate = f'<b>%{{x}}</b><br>{trace.name}: %{{y:{final_fmt_spec}}}<extra></extra>'
+            trace.textposition = 'outside' if barmode != 'stack' else 'inside'
+            if trace.textposition == 'inside':
+                trace.insidetextanchor = 'middle' # Valid values: 'start', 'middle', 'end'
+            # No 'else' needed for insidetextanchor as it's not relevant/ignored for 'outside'
+            trace.textfont = dict(size=9, color='rgba(0,0,0,0.7)' if barmode == 'stack' else 'black')
+            if hasattr(trace, 'marker') and hasattr(trace.marker, 'line'):
+                trace.marker.line.width = 0.5
+                trace.marker.line.color = 'rgba(0,0,0,0.3)'
 
     if barmode == 'stack' and show_total_for_stacked and actual_y_cols_for_plotting:
-        df_total_sum_calc = df.copy()
-        # Important: Sum using the original, numeric columns from df_input before any potential renaming by px.bar for display
-        df_total_sum_calc['_total_stacked_val_'] = df_total_sum_calc[actual_y_cols_for_plotting].sum(axis=1, numeric_only=True)
-        
-        annotations_total_list = [
-            dict(x=row[x_col], y=row['_total_stacked_val_'], 
-                 text=f"{row['_total_stacked_val_']:{final_fmt_spec}}",
+        df_total_sum_calc = df.copy() 
+        df_total_sum_calc['_total_stacked_'] = df_total_sum_calc[actual_y_cols_for_plotting].sum(axis=1, numeric_only=True)
+        annotations_list_total = [
+            dict(x=row[x_col], y=row['_total_stacked_'], 
+                 text=f"{row['_total_stacked_']:{final_fmt_spec}}",
                  font=dict(size=10, color=config.COLOR_TARGET_LINE), 
                  showarrow=False, yanchor='bottom', yshift=4, xanchor='center')
-            for _, row in df_total_sum_calc.iterrows() if pd.notna(row['_total_stacked_val_'])
+            for _, row in df_total_sum_calc.iterrows() if pd.notna(row['_total_stacked_'])
         ]
-        if annotations_total_list:
-            current_fig_annotations_list = list(fig.layout.annotations or [])
-            fig.update_layout(annotations=current_fig_annotations_list + annotations_total_list)
+        if annotations_list_total:
+            current_layout_annotations = list(fig.layout.annotations or ())
+            fig.update_layout(annotations=current_layout_annotations + annotations_list_total)
 
     fig.update_layout(
         title=dict(text=title_text, x=0.03, y=0.97, xanchor='left', yanchor='top', font_size=16),
@@ -302,11 +289,11 @@ def create_comparison_bar_chart(df_input: pd.DataFrame, x_col: str,
         legend=dict(orientation="h", yanchor="top", y=-0.2 if len(actual_y_cols_for_plotting)>3 else -0.15, xanchor="center", x=0.5, font_size=9),
         yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.08)'),
         xaxis=dict(showgrid=False, type='category', linecolor='rgba(0,0,0,0.2)'),
-        bargap=0.2, 
-        bargroupgap=0.05 if barmode == 'group' else 0,
+        bargap=0.2, bargroupgap=0.05 if barmode == 'group' else 0,
         margin=dict(l=50, r=20, t=60, b=100 if len(actual_y_cols_for_plotting)>2 else 70)
     )
     return fig
+
 
 # --- Metric Card (UX Enhanced - Robust Version) ---
 def display_metric_card(st_object, label_key: str, value: Optional[Union[int, float, np.number]], lang: str,
@@ -386,8 +373,7 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
     fig = go.Figure()
     colors_list_radar = px.colors.qualitative.Vivid 
     has_groups_on_radar = group_col and group_col in df_radar.columns and df_radar[group_col].nunique() > 0
-    
-    plot_data_exists = False # Flag to check if any actual data is plotted for the main series
+    plot_data_exists = False
     if has_groups_on_radar:
         for i, (name_grp_radar_plot, group_data_radar_df) in enumerate(df_radar.groupby(group_col)):
             if not group_data_radar_df.empty and not group_data_radar_df[values_col].dropna().empty: plot_data_exists = True
@@ -406,22 +392,19 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
                 r=single_series_ordered_df[values_col], theta=single_series_ordered_df[categories_col],
                 fill='toself', name=get_lang_text(lang, "average_score_label"), line_color=colors_list_radar[0],
                 opacity=fill_opacity + 0.15, hovertemplate='<b>%{theta}</b>: %{r:.1f}<extra></extra>'))
-    
     if target_values_map: 
         target_r_values_ordered = [target_values_map.get(cat, 0) for cat in all_categories_ordered_list]
         fig.add_trace(go.Scatterpolar(
             r=target_r_values_ordered, theta=all_categories_ordered_list, mode='lines', name=get_lang_text(lang, "target_label"),
             line=dict(color=config.COLOR_TARGET_LINE, dash='dashdot', width=2.5), hoverinfo='skip')) 
-            
-    show_legend_flag_radar = has_groups_on_radar or (target_values_map and plot_data_exists)
-
+    show_legend_final_radar = has_groups_on_radar or (target_values_map and plot_data_exists)
     fig.update_layout(
         title=dict(text=title_text, x=0.5, y=0.97, yanchor='top', font_size=16), 
-        polar=dict(bgcolor="rgba(248,248,248,0.0)", 
+        polar=dict(bgcolor="rgba(248,248,248,0.1)", 
                    radialaxis=dict(visible=True, range=[0, radial_range_max_final], showline=True, linecolor='rgba(0,0,0,0.15)', gridcolor="rgba(0,0,0,0.1)", tickfont_size=8, nticks=5, showticklabels=True, layer='below traces'),
                    angularaxis=dict(showline=True, linecolor='rgba(0,0,0,0.15)', gridcolor="rgba(0,0,0,0.05)", tickfont_size=9, direction="clockwise", showticklabels=True, layer='below traces')),
-        showlegend=show_legend_flag_radar, 
-        legend=dict(orientation="h", yanchor="top", y=-0.1, xanchor="center", x=0.5, font_size=9, itemsizing='constant'), 
+        showlegend=show_legend_final_radar, 
+        legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5, font_size=9, itemsizing='constant'), 
         margin=dict(l=30, r=30, t=50, b=70), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
     return fig
 
