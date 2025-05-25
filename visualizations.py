@@ -305,14 +305,16 @@ def create_trend_chart(df_input: pd.DataFrame, date_col: str,
     _apply_standard_layout(fig, lang, title_text_direct=title_text_direct,
                            x_axis_title_key=x_axis_title_key, y_axis_title_key=y_axis_title_key,
                            legend_params=legend_params_trend, margin_params=margin_params)
-    fig.update_layout(
+    fig.update_layout( # Specific updates for this chart type
         xaxis_gridcolor=config.COLOR_GRID_SECONDARY,
         yaxis_gridcolor=config.COLOR_GRID_PRIMARY,
         yaxis_tickformat=(y_axis_format_str if y_axis_format_str else None)
     )
+    # Use update_xaxes to modify existing xaxis from _apply_standard_layout
+    # Defensive checks for df.empty or missing date_col for rangeslider and rangeselector
     show_range_slider_selector = not df.empty and date_col in df.columns and not df[date_col].empty and len(df[date_col].unique()) > 15
     fig.update_xaxes(
-        type='date',
+        type='date', # Ensures Plotly treats x-axis as date for range selector functionality
         showspikes=True,
         spikemode='across+marker',
         spikesnap='cursor',
@@ -331,7 +333,7 @@ def create_trend_chart(df_input: pd.DataFrame, date_col: str,
             bgcolor=config.COLOR_RANGESELECTOR_BACKGROUND,
             borderwidth=1, bordercolor=config.COLOR_RANGESELECTOR_BORDER,
             y=1.18, x=0.01, xanchor='left'
-        ) if show_range_slider_selector else None
+        ) if show_range_slider_selector else None # Only show if date_col is valid and data exists
     )
     return fig
 
@@ -393,10 +395,10 @@ def create_comparison_bar_chart(df_input: pd.DataFrame, x_col: str,
                            x_axis_title_key=x_axis_title_key, y_axis_title_key=y_axis_title_key,
                            legend_params=legend_params_bar, margin_params=margin_params)
     fig.update_layout(
-        xaxis_tickangle=-30 if not df.empty and x_col in df.columns and df[x_col].nunique() > 7 else 0,
+        xaxis_tickangle=-30 if not df.empty and x_col in df.columns and df[x_col].nunique() > 7 else 0, # Defensive check for x_col
         yaxis_gridcolor=config.COLOR_GRID_PRIMARY,
-        xaxis_type='category',
-        xaxis_showgrid=False,
+        xaxis_type='category', 
+        xaxis_showgrid=False, # Bar charts usually don't show x-grid
         xaxis_linecolor=config.COLOR_AXIS_LINE,
         bargap=0.2, bargroupgap=0.05 if barmode == 'group' else 0,
     )
@@ -506,43 +508,33 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
                 primary_group_name = matching_groups[0]
                 break
     
-    plotted_groups_count = 0
+    plotted_groups_count = 0 # This will be used to cycle through colors_list_radar for non-primary groups
 
     if has_groups_on_radar:
-        group_names_to_plot = [g for g in df_radar[group_col].unique()]
-        if primary_group_name and primary_group_name in group_names_to_plot:
-            group_names_to_plot.remove(primary_group_name)
-            group_names_to_plot.insert(0, primary_group_name)
+        # Order groups to plot primary group first if it exists
+        group_names_ordered = sorted(df_radar[group_col].unique(), key=lambda x: (x != primary_group_name, x))
 
-        for name_grp_radar_plot in group_names_to_plot:
+        for name_grp_radar_plot in group_names_ordered:
             group_data_radar_df = df_radar[df_radar[group_col] == name_grp_radar_plot]
             if not group_data_radar_df.empty and not group_data_radar_df[values_col].dropna().empty:
                 plot_data_exists = True
                 current_grp_ordered_df = pd.DataFrame({categories_col: all_categories_ordered_list}).merge(
                     group_data_radar_df, on=categories_col, how='left').fillna({values_col: 0})
 
-                current_line_width = line_width + 0.5 if name_grp_radar_plot == primary_group_name else line_width
-                
-                if name_grp_radar_plot == primary_group_name:
-                    current_color = config.COLOR_RADAR_PRIMARY_TRACE
-                else:
-                    # Use modulo arithmetic ensuring not to reuse primary trace color index if it's part of colors_list_radar
-                    # This logic assumes COLOR_RADAR_PRIMARY_TRACE is distinct or handled if it's in colors_list_radar
-                    # A simple approach if primary_group_name uses a color from the list (e.g. the first one):
-                    effective_plotted_count = plotted_groups_count
-                    if primary_group_name: # if primary was plotted, offset others
-                         effective_plotted_count = plotted_groups_count -1 if plotted_groups_count > 0 else 0
-                    current_color = colors_list_radar[effective_plotted_count % len(colors_list_radar)]
-
+                is_primary = (name_grp_radar_plot == primary_group_name)
+                current_line_width = line_width + 0.75 if is_primary else line_width # Make primary line thicker
+                current_color = config.COLOR_RADAR_PRIMARY_TRACE if is_primary else colors_list_radar[plotted_groups_count % len(colors_list_radar)]
+                current_fill_opacity = fill_opacity + 0.1 if is_primary else fill_opacity # Slightly more opaque primary fill
 
                 fig.add_trace(go.Scatterpolar(
                     r=current_grp_ordered_df[values_col], theta=current_grp_ordered_df[categories_col],
                     fill='toself', name=str(name_grp_radar_plot),
                     line=dict(color=current_color, width=current_line_width),
                     fillcolor=current_color,
-                    opacity=fill_opacity if name_grp_radar_plot != primary_group_name else fill_opacity + 0.05, # Slightly more opaque fill for primary
+                    opacity=current_fill_opacity,
                     hovertemplate='<b>%{theta}</b><br>' + f'{str(name_grp_radar_plot)}: %{{r:.1f}}<extra></extra>' ))
-                plotted_groups_count += 1 # Increment for next distinct color
+                if not is_primary: # Only increment color index for non-primary groups
+                    plotted_groups_count += 1
     else: 
         if values_col in df_radar.columns and not df_radar[values_col].dropna().empty:
             plot_data_exists = True
@@ -551,25 +543,25 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
             fig.add_trace(go.Scatterpolar(
                 r=single_series_ordered_df[values_col], theta=single_series_ordered_df[categories_col],
                 fill='toself', name=get_lang_text(lang, "average_score_label"),
-                line=dict(color=config.COLOR_RADAR_PRIMARY_TRACE, width=line_width + 0.5),
+                line=dict(color=config.COLOR_RADAR_PRIMARY_TRACE, width=line_width + 0.75), # Use primary for single distinct trace
                 fillcolor=config.COLOR_RADAR_PRIMARY_TRACE,
-                opacity=fill_opacity + 0.05,
+                opacity=fill_opacity + 0.1,
                 hovertemplate='<b>%{theta}</b>: %{r:.1f}<extra></extra>'))
 
     if target_values_map:
         target_r_values_ordered = [target_values_map.get(cat, 0) for cat in all_categories_ordered_list]
         fig.add_trace(go.Scatterpolar(
             r=target_r_values_ordered, theta=all_categories_ordered_list, mode='lines', name=get_lang_text(lang, "target_label"),
-            line=dict(color=config.COLOR_RADAR_TARGET_LINE, dash='dashdot', width=line_width - 0.5), # Target line slightly thinner
+            line=dict(color=config.COLOR_RADAR_TARGET_LINE, dash='dashdot', width=line_width - 0.5), # Target line thinner
             hoverinfo='skip'))
 
     show_legend_final_radar = has_groups_on_radar or (target_values_map and plot_data_exists)
 
     title_text_direct = get_lang_text(lang, title_key)
-    margin_params = dict(l=50, r=50, t=70, b=100 if show_legend_final_radar else 70) 
+    margin_params = dict(l=50, r=50, t=70, b=110 if show_legend_final_radar else 70) # More bottom margin for legend
     legend_params_radar = {
         "showlegend": show_legend_final_radar,
-        "orientation":"h", "yanchor":"bottom", "y": -0.40, "xanchor":"center", "x":0.5,
+        "orientation":"h", "yanchor":"bottom", "y": -0.45, "xanchor":"center", "x":0.5, # Adjusted y for even more space
         "font_size": config.FONT_SIZE_LEGEND,
         "itemsizing": 'constant',
         "title_text": get_lang_text(lang, "metrics_legend", "Legend") if has_groups_on_radar and show_legend_final_radar else "",
@@ -597,10 +589,6 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
                 tickfont=dict(size=config.FONT_SIZE_RADAR_ANGULAR_TICK, color=config.COLOR_RADAR_TICK_LABEL),
                 direction="clockwise",
                 showticklabels=True, layer='below traces',
-                # Optional: If category labels are very long and overlap, manual wrapping could be explored
-                # For simple wrapping:
-                # tickvals=all_categories_ordered_list,
-                # ticktext=[label.replace(" ", "<br>") for label in all_categories_ordered_list],
             )
         )
     )
@@ -620,7 +608,8 @@ def create_facility_heatmap(
     colorscale: str = "Reds", 
     show_points: bool = False, 
     point_size: int = 3,
-    point_opacity: float = 0.6
+    point_opacity: float = 0.6,
+    colorbar_title_key: str = "stress_level_label_short" # Default colorbar title key
 ) -> go.Figure:
 
     df = df_input.copy()
@@ -654,7 +643,6 @@ def create_facility_heatmap(
     }
     plotly_histfunc = histfunc_map.get(aggregation_func.lower(), "avg")
     
-    # Ensure min and max are different for bin size calculation
     x_min, x_max = df[x_col].min(), df[x_col].max()
     y_min, y_max = df[y_col].min(), df[y_col].max()
 
@@ -666,22 +654,25 @@ def create_facility_heatmap(
     if ybins and ybins > 0 and (y_max - y_min > config.EPSILON):
         ybins_dict['size'] = (y_max - y_min) / ybins
 
+    colorbar_config = dict(
+        title=dict(
+            text=get_lang_text(lang, colorbar_title_key, "Value"),
+            side="right",
+            font=dict(size=config.FONT_SIZE_AXIS_TITLE, color=config.COLOR_TEXT_PRIMARY)
+        ),
+        tickfont=dict(size=config.FONT_SIZE_AXIS_TICKS, color=config.COLOR_TEXT_PRIMARY),
+    )
 
     fig.add_trace(go.Histogram2d(
         x=df[x_col],
         y=df[y_col],
         z=df[z_col],
         histfunc=plotly_histfunc,
-        xbins=xbins_dict if xbins_dict else None, # Pass dict or None
-        ybins=ybins_dict if ybins_dict else None, # Pass dict or None
+        xbins=xbins_dict if xbins_dict else None,
+        ybins=ybins_dict if ybins_dict else None,
         colorscale=colorscale,
         showscale=True,
-        colorbar=dict(
-            title=get_lang_text(lang, "stress_level_label_short", "Value"), # Consider a more generic z-axis title or pass as param
-            titleside="right",
-            tickfont=dict(size=config.FONT_SIZE_AXIS_TICKS, color=config.COLOR_TEXT_PRIMARY),
-            titlefont=dict(size=config.FONT_SIZE_AXIS_TITLE, color=config.COLOR_TEXT_PRIMARY)
-        ),
+        colorbar=colorbar_config,
         zmin=df[z_col].min() if plotly_histfunc != "count" and not df[z_col].empty else None,
         zmax=df[z_col].max() if plotly_histfunc != "count" and not df[z_col].empty else None,
     ))
@@ -698,7 +689,7 @@ def create_facility_heatmap(
                 opacity=point_opacity,
                 showscale=False 
             ),
-            hovertext=[f"{z_val:.2f}" for z_val in df[z_col]], # Formatted hovertext
+            hovertext=[f"{z_val:.2f}" for z_val in df[z_col]],
             hoverinfo='x+y+text',
             name=get_lang_text(lang, "individual_data_points_label", "Data Points")
         ))
