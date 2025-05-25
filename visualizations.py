@@ -57,11 +57,11 @@ def _apply_standard_layout(fig: go.Figure,
                       xanchor='left', yanchor='top',
                       font=dict(size=config.FONT_SIZE_TITLE_DEFAULT,
                                 family=config.FONT_FAMILY_DEFAULT)),
-        "paper_bgcolor": config.COLOR_PAPER_BACKGROUND,
-        "plot_bgcolor": config.COLOR_PLOT_BACKGROUND,
+        "paper_bgcolor": config.COLOR_PAPER_BACKGROUND, # Transparent paper
+        "plot_bgcolor": config.COLOR_PLOT_BACKGROUND,   # Light gray plot area
         "font": dict(family=config.FONT_FAMILY_DEFAULT,
                      size=config.FONT_SIZE_BODY_DEFAULT,
-                     color=config.COLOR_TEXT_PRIMARY),
+                     color=config.COLOR_TEXT_PRIMARY), # Text primary for high contrast on gray
         "hovermode": "x unified",
         "hoverlabel": dict(
             bgcolor=config.COLOR_HOVER_LABEL_BACKGROUND,
@@ -70,18 +70,23 @@ def _apply_standard_layout(fig: go.Figure,
             namelength=-1
         ),
         "margin": margin_params if margin_params is not None else config.DEFAULT_CHART_MARGINS,
-        "xaxis": {},
-        "yaxis": {}
+        "xaxis": {"title": {}},
+        "yaxis": {"title": {}}
     }
 
     if x_axis_title_key:
-        if "title" not in layout_settings["xaxis"]:
-            layout_settings["xaxis"]["title"] = {}
         layout_settings["xaxis"]["title"]["text"] = get_lang_text(lang, x_axis_title_key, x_axis_title_key)
+        layout_settings["xaxis"]["gridcolor"] = config.COLOR_GRID_SECONDARY # Apply grid color
+        layout_settings["xaxis"]["linecolor"] = config.COLOR_AXIS_LINE     # Apply axis line color
+        layout_settings["xaxis"]["zerolinecolor"] = config.COLOR_GRID_SECONDARY # Ensure zeroline matches grid
+        layout_settings["xaxis"]["zerolinewidth"] = 1
     if y_axis_title_key:
-        if "title" not in layout_settings["yaxis"]:
-            layout_settings["yaxis"]["title"] = {}
         layout_settings["yaxis"]["title"]["text"] = get_lang_text(lang, y_axis_title_key, y_axis_title_key)
+        layout_settings["yaxis"]["gridcolor"] = config.COLOR_GRID_PRIMARY
+        layout_settings["yaxis"]["linecolor"] = config.COLOR_AXIS_LINE
+        layout_settings["yaxis"]["zerolinecolor"] = config.COLOR_GRID_PRIMARY
+        layout_settings["yaxis"]["zerolinewidth"] = 1
+
 
     show_legend_flag = True
     if legend_params is not None:
@@ -105,7 +110,7 @@ def _apply_standard_layout(fig: go.Figure,
         for key, val in extra_layout_updates.items():
             if isinstance(val, dict) and isinstance(layout_settings.get(key), dict):
                 current_sub_dict = layout_settings.get(key, {})
-                current_sub_dict.update(val)
+                current_sub_dict.update(val) # Merge for xaxis, yaxis, title etc.
                 layout_settings[key] = current_sub_dict
             else:
                 layout_settings[key] = val
@@ -115,7 +120,6 @@ def _apply_standard_layout(fig: go.Figure,
         logger.error(f"Error applying layout settings in _apply_standard_layout: {e}")
         logger.error(f"Layout settings dump for problematic chart ('{title_text_direct}'): {layout_settings}")
         raise
-
 
 # --- Standardized No Data Figure ---
 def _create_no_data_figure(lang: str, title_key_for_base: str,
@@ -132,7 +136,7 @@ def _create_no_data_figure(lang: str, title_key_for_base: str,
             "xaxis_visible": False,
             "yaxis_visible": False,
             "showlegend": False,
-            "plot_bgcolor": config.COLOR_PAPER_BACKGROUND,
+            "plot_bgcolor": config.COLOR_PAPER_BACKGROUND, # Use paper for flat no-data message
         }
     )
     fig.add_annotation(
@@ -229,7 +233,7 @@ def create_kpi_gauge(value: Optional[Union[int, float, np.number]], title_key: s
                      'tickfont':{'size': config.FONT_SIZE_AXIS_TICKS_GAUGE}},
             'bar': {'color': config.COLOR_GAUGE_NEEDLE_BASE, 'thickness': 0.15,
                     'line':{'color':config.COLOR_GAUGE_NEEDLE_BORDER, 'width':0.5}},
-            'bgcolor': config.COLOR_GAUGE_BACKGROUND,
+            'bgcolor': config.COLOR_GAUGE_BACKGROUND, # This is the gauge component's own bg
             'borderwidth': 0.5, 'bordercolor': config.COLOR_GAUGE_BORDERCOLOR,
             'steps': gauge_steps,
             'threshold': {'line': {'color': config.COLOR_TARGET_LINE, 'width': 2},
@@ -237,6 +241,7 @@ def create_kpi_gauge(value: Optional[Union[int, float, np.number]], title_key: s
             } if target_line_val_float is not None else {}
         }
     ))
+    # Gauge overall figure background uses paper_bgcolor from config
     fig.update_layout(height=170, margin=dict(l=10, r=10, t=45, b=10), paper_bgcolor=config.COLOR_PAPER_BACKGROUND)
     return fig
 
@@ -305,16 +310,17 @@ def create_trend_chart(df_input: pd.DataFrame, date_col: str,
     _apply_standard_layout(fig, lang, title_text_direct=title_text_direct,
                            x_axis_title_key=x_axis_title_key, y_axis_title_key=y_axis_title_key,
                            legend_params=legend_params_trend, margin_params=margin_params)
-    fig.update_layout( # Specific updates for this chart type
-        xaxis_gridcolor=config.COLOR_GRID_SECONDARY,
+    # Specific updates for this chart type are applied after the base layout
+    # _apply_standard_layout already initializes xaxis and yaxis, so we update them here
+    fig.update_layout(
+        xaxis_gridcolor=config.COLOR_GRID_SECONDARY, # gridcolor is under xaxis/yaxis directly
         yaxis_gridcolor=config.COLOR_GRID_PRIMARY,
-        yaxis_tickformat=(y_axis_format_str if y_axis_format_str else None)
+        yaxis_tickformat=(y_axis_format_str if y_axis_format_str else None),
     )
-    # Use update_xaxes to modify existing xaxis from _apply_standard_layout
-    # Defensive checks for df.empty or missing date_col for rangeslider and rangeselector
+    # Update specific properties of the xaxis object
     show_range_slider_selector = not df.empty and date_col in df.columns and not df[date_col].empty and len(df[date_col].unique()) > 15
     fig.update_xaxes(
-        type='date', # Ensures Plotly treats x-axis as date for range selector functionality
+        type='date',
         showspikes=True,
         spikemode='across+marker',
         spikesnap='cursor',
@@ -333,7 +339,7 @@ def create_trend_chart(df_input: pd.DataFrame, date_col: str,
             bgcolor=config.COLOR_RANGESELECTOR_BACKGROUND,
             borderwidth=1, bordercolor=config.COLOR_RANGESELECTOR_BORDER,
             y=1.18, x=0.01, xanchor='left'
-        ) if show_range_slider_selector else None # Only show if date_col is valid and data exists
+        ) if show_range_slider_selector else None
     )
     return fig
 
@@ -395,10 +401,10 @@ def create_comparison_bar_chart(df_input: pd.DataFrame, x_col: str,
                            x_axis_title_key=x_axis_title_key, y_axis_title_key=y_axis_title_key,
                            legend_params=legend_params_bar, margin_params=margin_params)
     fig.update_layout(
-        xaxis_tickangle=-30 if not df.empty and x_col in df.columns and df[x_col].nunique() > 7 else 0, # Defensive check for x_col
+        xaxis_tickangle=-30 if not df.empty and x_col in df.columns and df[x_col].nunique() > 7 else 0,
         yaxis_gridcolor=config.COLOR_GRID_PRIMARY,
-        xaxis_type='category', 
-        xaxis_showgrid=False, # Bar charts usually don't show x-grid
+        xaxis_type='category',
+        xaxis_showgrid=False,
         xaxis_linecolor=config.COLOR_AXIS_LINE,
         bargap=0.2, bargroupgap=0.05 if barmode == 'group' else 0,
     )
@@ -508,13 +514,16 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
                 primary_group_name = matching_groups[0]
                 break
     
-    plotted_groups_count = 0 # This will be used to cycle through colors_list_radar for non-primary groups
+    plotted_groups_color_idx = 0 # Index for cycling through colors_list_radar for non-primary groups
 
     if has_groups_on_radar:
-        # Order groups to plot primary group first if it exists
-        group_names_ordered = sorted(df_radar[group_col].unique(), key=lambda x: (x != primary_group_name, x))
+        # Get unique groups while trying to preserve some order, then prioritize primary
+        group_names_to_plot = list(df_radar[group_col].unique()) # More stable order
+        if primary_group_name and primary_group_name in group_names_to_plot:
+            group_names_to_plot.remove(primary_group_name)
+            group_names_to_plot.insert(0, primary_group_name)
 
-        for name_grp_radar_plot in group_names_ordered:
+        for name_grp_radar_plot in group_names_to_plot:
             group_data_radar_df = df_radar[df_radar[group_col] == name_grp_radar_plot]
             if not group_data_radar_df.empty and not group_data_radar_df[values_col].dropna().empty:
                 plot_data_exists = True
@@ -522,9 +531,9 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
                     group_data_radar_df, on=categories_col, how='left').fillna({values_col: 0})
 
                 is_primary = (name_grp_radar_plot == primary_group_name)
-                current_line_width = line_width + 0.75 if is_primary else line_width # Make primary line thicker
-                current_color = config.COLOR_RADAR_PRIMARY_TRACE if is_primary else colors_list_radar[plotted_groups_count % len(colors_list_radar)]
-                current_fill_opacity = fill_opacity + 0.1 if is_primary else fill_opacity # Slightly more opaque primary fill
+                current_line_width = line_width + 0.75 if is_primary else line_width
+                current_color = config.COLOR_RADAR_PRIMARY_TRACE if is_primary else colors_list_radar[plotted_groups_color_idx % len(colors_list_radar)]
+                current_fill_opacity = fill_opacity + 0.1 if is_primary else fill_opacity
 
                 fig.add_trace(go.Scatterpolar(
                     r=current_grp_ordered_df[values_col], theta=current_grp_ordered_df[categories_col],
@@ -533,8 +542,8 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
                     fillcolor=current_color,
                     opacity=current_fill_opacity,
                     hovertemplate='<b>%{theta}</b><br>' + f'{str(name_grp_radar_plot)}: %{{r:.1f}}<extra></extra>' ))
-                if not is_primary: # Only increment color index for non-primary groups
-                    plotted_groups_count += 1
+                if not is_primary:
+                    plotted_groups_color_idx += 1 
     else: 
         if values_col in df_radar.columns and not df_radar[values_col].dropna().empty:
             plot_data_exists = True
@@ -543,7 +552,7 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
             fig.add_trace(go.Scatterpolar(
                 r=single_series_ordered_df[values_col], theta=single_series_ordered_df[categories_col],
                 fill='toself', name=get_lang_text(lang, "average_score_label"),
-                line=dict(color=config.COLOR_RADAR_PRIMARY_TRACE, width=line_width + 0.75), # Use primary for single distinct trace
+                line=dict(color=config.COLOR_RADAR_PRIMARY_TRACE, width=line_width + 0.75),
                 fillcolor=config.COLOR_RADAR_PRIMARY_TRACE,
                 opacity=fill_opacity + 0.1,
                 hovertemplate='<b>%{theta}</b>: %{r:.1f}<extra></extra>'))
@@ -552,16 +561,18 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
         target_r_values_ordered = [target_values_map.get(cat, 0) for cat in all_categories_ordered_list]
         fig.add_trace(go.Scatterpolar(
             r=target_r_values_ordered, theta=all_categories_ordered_list, mode='lines', name=get_lang_text(lang, "target_label"),
-            line=dict(color=config.COLOR_RADAR_TARGET_LINE, dash='dashdot', width=line_width - 0.5), # Target line thinner
+            line=dict(color=config.COLOR_RADAR_TARGET_LINE, dash='dashdot', width=line_width - 0.5),
             hoverinfo='skip'))
 
     show_legend_final_radar = has_groups_on_radar or (target_values_map and plot_data_exists)
 
     title_text_direct = get_lang_text(lang, title_key)
-    margin_params = dict(l=50, r=50, t=70, b=110 if show_legend_final_radar else 70) # More bottom margin for legend
+    # Adjusted margins, especially bottom for legend with potentially long category names
+    margin_bottom = 120 if show_legend_final_radar and len(all_categories_ordered_list) > 5 else (90 if show_legend_final_radar else 70)
+    margin_params = dict(l=50, r=50, t=70, b=margin_bottom) 
     legend_params_radar = {
         "showlegend": show_legend_final_radar,
-        "orientation":"h", "yanchor":"bottom", "y": -0.45, "xanchor":"center", "x":0.5, # Adjusted y for even more space
+        "orientation":"h", "yanchor":"bottom", "y": -0.45, "xanchor":"center", "x":0.5, # Increased negative y
         "font_size": config.FONT_SIZE_LEGEND,
         "itemsizing": 'constant',
         "title_text": get_lang_text(lang, "metrics_legend", "Legend") if has_groups_on_radar and show_legend_final_radar else "",
@@ -573,7 +584,7 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
 
     fig.update_layout(
         polar=dict(
-            bgcolor=config.COLOR_RADAR_POLAR_BACKGROUND,
+            bgcolor=config.COLOR_RADAR_POLAR_BACKGROUND, # Uses COLOR_PLOT_BACKGROUND
             radialaxis=dict(
                 visible=True, range=[0, radial_range_max_final], showline=True,
                 linecolor=config.COLOR_RADAR_AXIS_LINE,
@@ -595,122 +606,208 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
     return fig
 
 # --- Facility Heatmap Visualization ---
-def create_facility_heatmap(
+def create_metric_density_heatmap(
     df_input: pd.DataFrame,
     x_col: str, 
     y_col: str, 
     z_col: str, 
     title_key: str,
     lang: str,
-    xbins: Optional[int] = 20, 
-    ybins: Optional[int] = 20, 
-    aggregation_func: str = "avg", 
-    colorscale: str = "Reds", 
-    show_points: bool = False, 
-    point_size: int = 3,
-    point_opacity: float = 0.6,
-    colorbar_title_key: str = "stress_level_label_short" # Default colorbar title key
+    aggregation_func: str = "avg",
+    xbins: int = config.HEATMAP_NBINSX_DEFAULT,
+    ybins: int = config.HEATMAP_NBINSY_DEFAULT,
+    colorscale: str = config.HEATMAP_COLORSCALE_DEFAULT,
+    colorbar_title_key: str = "value_axis_label", 
+    show_points: bool = config.HEATMAP_SHOW_POINTS_OVERLAY,
+    point_size: int = config.HEATMAP_POINT_SIZE,
+    point_opacity: float = config.HEATMAP_POINT_OPACITY,
+    facility_dimensions: Optional[Dict[str, float]] = None 
 ) -> go.Figure:
 
     df = df_input.copy()
     title_text = get_lang_text(lang, title_key)
 
     if df.empty or not all(c in df.columns for c in [x_col, y_col, z_col]):
-        logger.warning(f"Heatmap: Missing one or more required columns: {x_col}, {y_col}, {z_col}")
+        logger.warning(f"Metric Heatmap: Missing one or more required columns: {x_col}, {y_col}, {z_col}")
         return _create_no_data_figure(lang, title_key, message_key="heatmap_no_coordinate_data")
 
     df.dropna(subset=[x_col, y_col, z_col], inplace=True)
     if df.empty:
-        logger.warning(f"Heatmap: No valid data after dropping NaNs for columns: {x_col}, {y_col}, {z_col}")
+        logger.warning(f"Metric Heatmap: No valid data after dropping NaNs for {x_col}, {y_col}, {z_col}")
         return _create_no_data_figure(lang, title_key, message_key="heatmap_no_value_data")
 
     try:
-        df[x_col] = pd.to_numeric(df[x_col])
-        df[y_col] = pd.to_numeric(df[y_col])
-        df[z_col] = pd.to_numeric(df[z_col])
+        df[x_col] = pd.to_numeric(df[x_col], errors='coerce')
+        df[y_col] = pd.to_numeric(df[y_col], errors='coerce')
+        df[z_col] = pd.to_numeric(df[z_col], errors='coerce')
+        df.dropna(subset=[x_col, y_col, z_col], inplace=True)
+        if df.empty: raise ValueError("All data became NaN after numeric conversion.")
     except ValueError as e:
-        logger.error(f"Heatmap: Error converting columns to numeric for heatmap: {e}")
+        logger.error(f"Metric Heatmap: Error converting columns to numeric: {e}")
         return _create_no_data_figure(lang, title_key, message_key="chart_generation_error_label")
 
     fig = go.Figure()
 
-    histfunc_map = {
-        "avg": "avg", "average": "avg",
-        "sum": "sum", "total": "sum",
-        "count": "count",
-        "min": "min",
-        "max": "max"
-    }
+    histfunc_map = {"avg": "avg", "average": "avg", "sum": "sum", "total": "sum", "count": "count", "min": "min", "max": "max"}
     plotly_histfunc = histfunc_map.get(aggregation_func.lower(), "avg")
     
-    x_min, x_max = df[x_col].min(), df[x_col].max()
-    y_min, y_max = df[y_col].min(), df[y_col].max()
+    x_min_data, x_max_data = df[x_col].min(), df[x_col].max()
+    y_min_data, y_max_data = df[y_col].min(), df[y_col].max()
 
-    xbins_dict = {}
-    if xbins and xbins > 0 and (x_max - x_min > config.EPSILON):
-        xbins_dict['size'] = (x_max - x_min) / xbins
+    xbins_config = {}
+    if xbins and xbins > 0 and (x_max_data - x_min_data > config.EPSILON):
+        xbins_config['size'] = (x_max_data - x_min_data) / xbins
     
-    ybins_dict = {}
-    if ybins and ybins > 0 and (y_max - y_min > config.EPSILON):
-        ybins_dict['size'] = (y_max - y_min) / ybins
-
+    ybins_config = {}
+    if ybins and ybins > 0 and (y_max_data - y_min_data > config.EPSILON):
+        ybins_config['size'] = (y_max_data - y_min_data) / ybins
+    
     colorbar_config = dict(
         title=dict(
-            text=get_lang_text(lang, colorbar_title_key, "Value"),
-            side="right",
+            text=get_lang_text(lang, colorbar_title_key, "Value"), side="right",
             font=dict(size=config.FONT_SIZE_AXIS_TITLE, color=config.COLOR_TEXT_PRIMARY)
         ),
         tickfont=dict(size=config.FONT_SIZE_AXIS_TICKS, color=config.COLOR_TEXT_PRIMARY),
+        thickness=15, len=0.75,
+        bgcolor=config.COLOR_LEGEND_BACKGROUND, # Use legend bg for consistency
+        bordercolor=config.COLOR_LEGEND_BORDER,
+        borderwidth=1
     )
 
     fig.add_trace(go.Histogram2d(
-        x=df[x_col],
-        y=df[y_col],
-        z=df[z_col],
+        x=df[x_col], y=df[y_col], z=df[z_col],
         histfunc=plotly_histfunc,
-        xbins=xbins_dict if xbins_dict else None,
-        ybins=ybins_dict if ybins_dict else None,
-        colorscale=colorscale,
-        showscale=True,
-        colorbar=colorbar_config,
+        xbins=xbins_config if xbins_config else None,
+        ybins=ybins_config if ybins_config else None,
+        colorscale=colorscale, showscale=True, colorbar=colorbar_config,
         zmin=df[z_col].min() if plotly_histfunc != "count" and not df[z_col].empty else None,
         zmax=df[z_col].max() if plotly_histfunc != "count" and not df[z_col].empty else None,
+        name=get_lang_text(lang, aggregation_func + "_label", aggregation_func.title())
+    ))
+
+    if show_points:
+        hover_texts = [f"{z_val:.1f}" for z_val in df[z_col]]
+        fig.add_trace(go.Scatter(
+            x=df[x_col], y=df[y_col], mode='markers',
+            marker=dict(size=point_size, color=df[z_col], colorscale=colorscale, opacity=point_opacity, showscale=False),
+            text=hover_texts, hoverinfo='x+y+text',
+            name=get_lang_text(lang, "individual_data_points_label", "Data Points")
+        ))
+
+    shapes = []
+    if facility_dimensions and "width" in facility_dimensions and "height" in facility_dimensions:
+        shapes.append(
+            dict(type="rect", xref="x", yref="y",
+                 x0=facility_dimensions.get("x0", x_min_data - (xbins_config.get("size",1)*0.5) if xbins_config else x_min_data ), # adjust to edge of bins or data
+                 y0=facility_dimensions.get("y0", y_min_data - (ybins_config.get("size",1)*0.5) if ybins_config else y_min_data ),
+                 x1=facility_dimensions.get("x1", x_max_data + (xbins_config.get("size",1)*0.5) if xbins_config else x_max_data ),
+                 y1=facility_dimensions.get("y1", y_max_data + (ybins_config.get("size",1)*0.5) if ybins_config else y_max_data ),
+                 line=dict(color=config.FACILITY_OUTLINE_COLOR, width=2),
+                 layer="below" )
+        )
+
+    _apply_standard_layout(
+        fig, lang, title_text_direct=title_text,
+        x_axis_title_key="x_coordinate_label", y_axis_title_key="y_coordinate_label",
+        legend_params={"showlegend": show_points, "orientation": "v", "x": 1.02, "y": 1, "xanchor": "left", "yanchor": "top"},
+        extra_layout_updates={"shapes": shapes} if shapes else {}
+    )
+    fig.update_layout(
+        xaxis_constrain='domain', yaxis_scaleanchor='x', yaxis_scaleratio=1,
+        autosize=True # Ensure it fits container
+    )
+    return fig
+
+
+# --- Spatial Dynamics: Worker Density Heatmap (using Histogram2dContour) ---
+def create_worker_density_heatmap(
+    df_input: pd.DataFrame,
+    x_col: str, 
+    y_col: str, 
+    title_key: str,
+    lang: str,
+    ncontours: int = 15,
+    colorscale: str = "Blues", 
+    show_points: bool = False, 
+    point_size: int = 1,
+    point_color: str = 'rgba(0,0,0,0.3)',
+    facility_dimensions: Optional[Dict[str, float]] = None 
+) -> go.Figure:
+    df = df_input.copy()
+    title_text = get_lang_text(lang, title_key)
+
+    if df.empty or not all(c in df.columns for c in [x_col, y_col]):
+        logger.warning(f"Worker Density Heatmap: Missing coordinate columns: {x_col}, {y_col}")
+        return _create_no_data_figure(lang, title_key, message_key="heatmap_no_coordinate_data")
+
+    df.dropna(subset=[x_col, y_col], inplace=True)
+    if df.empty:
+        logger.warning(f"Worker Density Heatmap: No valid data after dropping NaNs for {x_col}, {y_col}")
+        return _create_no_data_figure(lang, title_key, message_key="heatmap_no_coordinate_data")
+    
+    try:
+        df[x_col] = pd.to_numeric(df[x_col], errors='coerce')
+        df[y_col] = pd.to_numeric(df[y_col], errors='coerce')
+        df.dropna(subset=[x_col, y_col], inplace=True)
+        if df.empty: raise ValueError("All coordinate data became NaN after numeric conversion.")
+    except ValueError as e:
+        logger.error(f"Worker Density Heatmap: Error converting columns to numeric: {e}")
+        return _create_no_data_figure(lang, title_key, message_key="chart_generation_error_label")
+
+    fig = go.Figure()
+
+    # For Histogram2dContour, z data is not explicitly provided, it calculates density
+    fig.add_trace(go.Histogram2dContour(
+        x = df[x_col], y = df[y_col],
+        colorscale = colorscale, reversescale = False, # Often density from low to high is intuitive
+        xaxis = 'x', yaxis = 'y',
+        showscale = True, 
+        ncontours = ncontours,
+        line=dict(width=0.5, color='rgba(0,0,0,0.2)'), # More subtle contour lines on gray
+        histnorm="density", # Show probability density; or "percent", or "" for count
+        colorbar=dict(
+            title=dict(
+                text=get_lang_text(lang, "density_label_short", "Density"), side="right",
+                font=dict(size=config.FONT_SIZE_AXIS_TITLE, color=config.COLOR_TEXT_PRIMARY)
+            ),
+            tickfont=dict(size=config.FONT_SIZE_AXIS_TICKS, color=config.COLOR_TEXT_PRIMARY),
+            thickness=15, len=0.75,
+            bgcolor=config.COLOR_LEGEND_BACKGROUND, bordercolor=config.COLOR_LEGEND_BORDER, borderwidth=1
+        ),
+        name=get_lang_text(lang, "density_label_short", "Density")
     ))
 
     if show_points:
         fig.add_trace(go.Scatter(
-            x=df[x_col],
-            y=df[y_col],
-            mode='markers',
-            marker=dict(
-                size=point_size,
-                color=df[z_col], 
-                colorscale=colorscale, 
-                opacity=point_opacity,
-                showscale=False 
-            ),
-            hovertext=[f"{z_val:.2f}" for z_val in df[z_col]],
-            hoverinfo='x+y+text',
-            name=get_lang_text(lang, "individual_data_points_label", "Data Points")
+            x=df[x_col], y=df[y_col],
+            mode='markers', marker=dict(color=point_color, size=point_size, opacity=0.5),
+            hoverinfo='skip',
+            name=get_lang_text(lang, "individual_data_points_label", "Locations")
         ))
+
+    shapes = []
+    if facility_dimensions and "width" in facility_dimensions and "height" in facility_dimensions:
+        x_min_data, x_max_data = df[x_col].min(), df[x_col].max()
+        y_min_data, y_max_data = df[y_col].min(), df[y_col].max()
+        shapes.append(
+            dict(type="rect", xref="x", yref="y",
+                 x0=facility_dimensions.get("x0", x_min_data), y0=facility_dimensions.get("y0", y_min_data),
+                 x1=facility_dimensions.get("x1", x_max_data), y1=facility_dimensions.get("y1", y_max_data),
+                 line=dict(color=config.FACILITY_OUTLINE_COLOR, width=2), layer="below"
+                )
+        )
 
     _apply_standard_layout(
         fig, lang, title_text_direct=title_text,
-        x_axis_title_key="x_coordinate_label",
-        y_axis_title_key="y_coordinate_label",
-        legend_params={"showlegend": show_points} 
+        x_axis_title_key="x_coordinate_label", y_axis_title_key="y_coordinate_label",
+        legend_params={"showlegend": False}, # Contour and heatmap legend managed by colorbar
+        extra_layout_updates={"shapes": shapes} if shapes else {}
     )
-
     fig.update_layout(
-        xaxis_constrain='domain',
-        yaxis_scaleanchor='x',    
-        yaxis_scaleratio=1,
-        xaxis_gridcolor=config.COLOR_GRID_SECONDARY,
-        yaxis_gridcolor=config.COLOR_GRID_PRIMARY,
+        autosize=True, xaxis_constrain='domain', yaxis_scaleanchor="x", yaxis_scaleratio=1,
+        xaxis_gridcolor=config.COLOR_GRID_SECONDARY, yaxis_gridcolor=config.COLOR_GRID_PRIMARY,
+        # Ensure plot_bgcolor from _apply_standard_layout is used
     )
-    fig.update_xaxes(automargin=True)
-    fig.update_yaxes(automargin=True)
-
     return fig
 
 # --- Stress Semáforo Visual ---
@@ -752,8 +849,9 @@ def create_stress_semaforo_visual(stress_level_value: Optional[Union[int, float,
             ],
             'bar': {'color': color_for_status_s, 'thickness': 0.4,
                     'line':{'color':config.COLOR_STRESS_BULLET_BAR_BORDER, 'width':0.5}},
-            'bgcolor': config.COLOR_STRESS_BULLET_BACKGROUND,
+            'bgcolor': config.COLOR_STRESS_BULLET_BACKGROUND, # Uses transparent bg
             'borderwidth': 0.5, 'bordercolor': config.COLOR_STRESS_BULLET_BORDER
         }))
+    # Gauge overall figure background uses paper_bgcolor from config
     fig.update_layout(height=80, margin=dict(t=10, b=5, l=5, r=5), paper_bgcolor=config.COLOR_PAPER_BACKGROUND)
     return fig
