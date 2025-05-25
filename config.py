@@ -13,7 +13,7 @@ except ImportError:
     logger.warning("config.py: plotly.express could not be imported. Color schemes relying on 'px' will use hardcoded fallbacks.")
 
 # --- GENERAL APPLICATION SETTINGS ---
-APP_VERSION = "v1.0.10 (GrayPlotBG)"
+APP_VERSION = "v1.0.11 (GrayPlotBGFinal)" # Updated version for this change
 APP_TITLE_KEY = "app_title"
 APP_ICON = "🦺"
 
@@ -23,7 +23,6 @@ DEFAULT_REGIONS = []
 DEFAULT_DEPARTMENTS = []
 DEFAULT_FUNCTIONAL_CATEGORIES = []
 DEFAULT_SHIFTS = []
-
 
 # --- VISUALIZATION & THEME ---
 FALLBACK_PLOTLY_DEFAULT = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
@@ -98,14 +97,14 @@ FONT_FAMILY_TARGET_ANNOTATION = "Arial Black"
 FONT_SIZE_BAR_TEXT = 9
 FONT_SIZE_SUBTITLE = 10
 
-COLOR_PAPER_BACKGROUND = 'rgba(0,0,0,0)'       # Transparent paper
-COLOR_PLOT_BACKGROUND = '#F0F0F0'             # Light Gray plot area (CHANGED)
-COLOR_TEXT_PRIMARY = "#1A1A1A"
+COLOR_PAPER_BACKGROUND = 'rgba(0,0,0,0)'     # Transparent paper to inherit Streamlit app background
+COLOR_PLOT_BACKGROUND = '#F0F0F0'            # Light Gray plot background area (THE KEY CHANGE)
+COLOR_TEXT_PRIMARY = "#1A1A1A"                # Near-black for text (ensure good contrast with #F0F0F0)
 COLOR_HOVER_LABEL_BACKGROUND = "white"
-COLOR_LEGEND_BACKGROUND = "rgba(255,255,255,0.85)"
+COLOR_LEGEND_BACKGROUND = "rgba(255,255,255,0.85)" # Semi-opaque white for legend on any bg
 COLOR_LEGEND_BORDER = 'rgba(0,0,0,0.2)'
-COLOR_GRID_PRIMARY = 'rgba(0,0,0,0.15)'       # Adjusted for better contrast on gray
-COLOR_GRID_SECONDARY = 'rgba(0,0,0,0.1)'      # Adjusted for better contrast on gray
+COLOR_GRID_PRIMARY = 'rgba(0,0,0,0.15)'       # More visible grid on light gray for Y-axis
+COLOR_GRID_SECONDARY = 'rgba(0,0,0,0.1)'      # More visible grid on light gray for X-axis
 COLOR_AXIS_LINE = 'rgba(0,0,0,0.4)'
 COLOR_SPIKE_LINE = 'rgba(0,0,0,0.3)'
 COLOR_RANGESELECTOR_BACKGROUND = 'rgba(200,200,200,0.7)'
@@ -115,6 +114,7 @@ COLOR_BAR_TEXT_OUTSIDE = COLOR_TEXT_PRIMARY
 COLOR_BAR_MARKER_BORDER = 'rgba(0,0,0,0.3)'
 COLOR_ANNOTATION_BG = "rgba(255,255,255,0.8)"
 
+# Gauge specific (often looks better transparent on the plot_bgcolor)
 FONT_SIZE_TITLE_GAUGE = 13
 FONT_SIZE_GAUGE_NUMBER = 30
 FONT_SIZE_GAUGE_DELTA = 12
@@ -122,20 +122,22 @@ FONT_SIZE_AXIS_TICKS_GAUGE = 9
 COLOR_GAUGE_TICK = "rgba(0,0,0,0.2)"
 COLOR_GAUGE_NEEDLE_BASE = "rgba(0,0,0,0.8)"
 COLOR_GAUGE_NEEDLE_BORDER = "rgba(0,0,0,1)"
-COLOR_GAUGE_BACKGROUND = "rgba(255,255,255,0.0)"
+COLOR_GAUGE_BACKGROUND = "rgba(0,0,0,0)" # Transparent, sits on plot_bgcolor
 COLOR_GAUGE_BORDERCOLOR = "rgba(0,0,0,0.1)"
 
+# Radar specific (polar area will now use COLOR_PLOT_BACKGROUND)
 COLOR_SCHEME_RADAR_DEFAULT = COLOR_SCHEME_RADAR_OPTIMAL
 RADAR_FILL_OPACITY = 0.10
-COLOR_RADAR_POLAR_BACKGROUND = COLOR_PLOT_BACKGROUND # Use the gray plot background (CHANGED)
+COLOR_RADAR_POLAR_BACKGROUND = COLOR_PLOT_BACKGROUND # Ensure radar plot area uses the new gray
 COLOR_RADAR_AXIS_LINE = 'rgba(0,0,0,0.5)'
-COLOR_RADAR_GRID_LINE = "rgba(0,0,0,0.25)"    # Adjusted for gray background
-COLOR_RADAR_ANGULAR_GRID_LINE = "rgba(0,0,0,0.15)" # Adjusted for gray background
+COLOR_RADAR_GRID_LINE = "rgba(0,0,0,0.25)"    # Make sure visible on light gray
+COLOR_RADAR_ANGULAR_GRID_LINE = "rgba(0,0,0,0.15)" # Make sure visible on light gray
 FONT_SIZE_RADAR_TICK = 10
 FONT_SIZE_RADAR_ANGULAR_TICK = 11
 COLOR_RADAR_TICK_LABEL = COLOR_TEXT_PRIMARY
-COLOR_RADAR_ANGULAR_TICK_BACKGROUND = 'rgba(255,255,255,0.0)' # Keep transparent
+COLOR_RADAR_ANGULAR_TICK_BACKGROUND = 'rgba(255,255,255,0.0)' # Transparent
 
+# Stress Semáforo specific (bullet background is transparent)
 FONT_SIZE_STRESS_SEMAFORO_NUMBER = 20
 FONT_SIZE_STRESS_SEMAFORO_TITLE = 12
 FONT_SIZE_STRESS_SEMAFORO_AXIS_TICK = 8
@@ -143,9 +145,10 @@ COLOR_STRESS_BULLET_LOW = "rgba(46, 204, 113, 0.5)"
 COLOR_STRESS_BULLET_MEDIUM = "rgba(241, 196, 15, 0.5)"
 COLOR_STRESS_BULLET_HIGH = "rgba(231, 76, 60, 0.5)"
 COLOR_STRESS_BULLET_BAR_BORDER = 'rgba(0,0,0,0.3)'
-COLOR_STRESS_BULLET_BACKGROUND = "rgba(0,0,0,0)"
+COLOR_STRESS_BULLET_BACKGROUND = "rgba(0,0,0,0)" # Transparent, sits on plot_bgcolor
 COLOR_STRESS_BULLET_BORDER = "rgba(0,0,0,0.1)"
 
+# Heatmap/Spatial Dynamics
 HEATMAP_COLORSCALE_DEFAULT = "Jet"
 HEATMAP_NBINSX_DEFAULT = 50
 HEATMAP_NBINSY_DEFAULT = 30
@@ -280,8 +283,8 @@ TEXT_STRINGS = {
         "workload_vs_psych_chart_title": "Workload Perception vs. Wellbeing Signals",
         "workload_perception_label": "Perceived Workload", "psychological_signals_label": "Wellbeing Signals",
 
-        "plant_map_title": "5. Spatial Dynamics Analysis", # Updated Title
-        "facility_heatmap_title": "Worker Density Heatmap (Avg. Stress)",
+        "plant_map_title": "5. Spatial Dynamics Analysis",
+        "facility_heatmap_title": "Worker Density Heatmap (Avg. Stress)", # Updated to use this more specifically
         "facility_incident_heatmap_title": "Incident Density Heatmap",
         "heatmap_no_coordinate_data": "Sufficient X/Y coordinate data is missing to generate the spatial map.",
         "heatmap_no_value_data": "Metric data for spatial visualization (e.g., Stress, Incidents) is missing or invalid.",
@@ -292,6 +295,7 @@ TEXT_STRINGS = {
         "incident_count_label_short": "Incidents",
         "individual_data_points_label": "Individual Records",
         "simulating_coordinates_caption": "Note: Facility coordinates are currently simulated for demonstration.",
+        "entry_exit_points_legend_label": "Key Locations", # For heatmap legend
 
 
         "ai_insights_title": "6. Predictive Risk Insights",
@@ -390,6 +394,7 @@ TEXT_STRINGS = {
         "stress_low_insight": "Average psychosocial stress ({stress_val}) is in a healthy range. Commendable! Continue to foster a supportive work environment and open communication channels.",
         "stress_trend_warn":"Concerning Stress Trend",
         "stress_trend_insight": "Recent trends suggest increasing workload perception or declining wellbeing signals. Proactively review team capacities and support mechanisms to mitigate burnout risk."
+        # Ensure ALL English keys above have their Spanish counterparts here for full functionality
     },
     "ES": {
         "app_title": "Signos Vitales Laborales",
@@ -450,7 +455,7 @@ TEXT_STRINGS = {
         "workload_vs_psych_chart_title": "Percepción de Carga vs. Señales de Bienestar",
         "workload_perception_label": "Percepción de Carga Laboral", "psychological_signals_label": "Señales de Bienestar",
 
-        "plant_map_title": "5. Vista Interactiva de Instalaciones",
+        "plant_map_title": "5. Vista Interactiva de Instalaciones", # Changed from "Spatial Dynamics Analysis" based on original EN
         "facility_heatmap_title": "Mapa de Calor de Niveles de Estrés Promedio en Instalación",
         "facility_incident_heatmap_title": "Mapa de Calor de Densidad de Incidentes",
         "heatmap_no_coordinate_data": "Faltan datos suficientes de coordenadas X/Y para generar el mapa espacial.",
@@ -462,6 +467,7 @@ TEXT_STRINGS = {
         "incident_count_label_short": "Incidentes",
         "individual_data_points_label": "Puntos de Dato",
         "simulating_coordinates_caption": "Nota: Las coordenadas de la instalación son simuladas para demostración.",
+        "entry_exit_points_legend_label": "Ubicaciones Clave",
 
 
         "ai_insights_title": "6. Perspectivas de Riesgo Predictivas",
