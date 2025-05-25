@@ -310,7 +310,10 @@ def create_trend_chart(df_input: pd.DataFrame, date_col: str,
         yaxis_gridcolor=config.COLOR_GRID_PRIMARY,
         yaxis_tickformat=(y_axis_format_str if y_axis_format_str else None)
     )
-    fig.update_xaxes( # Use update_xaxes to modify existing xaxis from _apply_standard_layout
+    # Use update_xaxes to modify existing xaxis from _apply_standard_layout
+    # Defensive checks for df.empty or missing date_col for rangeslider and rangeselector
+    show_range_slider_selector = not df.empty and date_col in df.columns and not df[date_col].empty and len(df[date_col].unique()) > 15
+    fig.update_xaxes(
         type='date',
         showspikes=True,
         spikemode='across+marker',
@@ -318,10 +321,10 @@ def create_trend_chart(df_input: pd.DataFrame, date_col: str,
         spikethickness=1,
         spikedash='solid',
         spikecolor=config.COLOR_SPIKE_LINE,
-        rangeslider_visible=len(df[date_col].unique()) > 15 if date_col in df.columns and not df.empty else False, # Defensive check
+        rangeslider_visible=show_range_slider_selector,
         rangeselector=dict(
             buttons=list([
-                dict(count=1, label="1M", step="month", stepmode="todate" if not df.empty and date_col in df.columns and not df[date_col].empty and df[date_col].max() > pd.Timestamp.now() - pd.DateOffset(months=1) else "backward"),
+                dict(count=1, label="1M", step="month", stepmode="todate" if show_range_slider_selector and df[date_col].max() > pd.Timestamp.now() - pd.DateOffset(months=1) else "backward"),
                 dict(count=3, label="3M", step="month", stepmode="backward"), dict(count=6, label="6M", step="month", stepmode="backward"),
                 dict(count=1, label="YTD", step="year", stepmode="todate"), dict(count=1, label=get_lang_text(lang, "1y_range_label", "1Y"), step="year", stepmode="backward"),
                 dict(step="all", label=get_lang_text(lang, "all_range_label", "All"))
@@ -330,7 +333,7 @@ def create_trend_chart(df_input: pd.DataFrame, date_col: str,
             bgcolor=config.COLOR_RANGESELECTOR_BACKGROUND,
             borderwidth=1, bordercolor=config.COLOR_RANGESELECTOR_BORDER,
             y=1.18, x=0.01, xanchor='left'
-        ) if date_col in df.columns and not df.empty else None # Only show if date_col is valid
+        ) if show_range_slider_selector else None
     )
     return fig
 
@@ -392,10 +395,13 @@ def create_comparison_bar_chart(df_input: pd.DataFrame, x_col: str,
                            x_axis_title_key=x_axis_title_key, y_axis_title_key=y_axis_title_key,
                            legend_params=legend_params_bar, margin_params=margin_params)
     fig.update_layout(
-        xaxis_tickangle=-30 if not df.empty and df[x_col].nunique() > 7 else 0,
+        xaxis_tickangle=-30 if not df.empty and x_col in df.columns and df[x_col].nunique() > 7 else 0, # Defensive check
         yaxis_gridcolor=config.COLOR_GRID_PRIMARY,
-        xaxis_type='category', xaxis_showgrid=False, xaxis_linecolor=config.COLOR_AXIS_LINE,
-        bargap=0.2, bargroupgap=0.05 if barmode == 'group' else 0,
+        xaxis_type='category', 
+        xaxis_showgrid=False, # Bar charts typically don't show x-grid
+        xaxis_linecolor=config.COLOR_AXIS_LINE,
+        bargap=0.2, 
+        bargroupgap=0.05 if barmode == 'group' else 0,
     )
     return fig
 
@@ -552,7 +558,7 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
     show_legend_final_radar = has_groups_on_radar or (target_values_map and plot_data_exists)
 
     title_text_direct = get_lang_text(lang, title_key)
-    margin_params = dict(l=40, r=40, t=60, b=100 if show_legend_final_radar else 70) # Increased bottom margin
+    margin_params = dict(l=40, r=40, t=60, b=100 if show_legend_final_radar else 70) # Adjusted bottom margin
     legend_params_radar = {
         "showlegend": show_legend_final_radar,
         "orientation":"h", "yanchor":"bottom", "y": -0.35, "xanchor":"center", "x":0.5, # More space below
@@ -573,7 +579,7 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
                 linecolor=config.COLOR_RADAR_AXIS_LINE,
                 gridcolor=config.COLOR_RADAR_GRID_LINE,
                 tickfont=dict(size=config.FONT_SIZE_RADAR_TICK, color=config.COLOR_RADAR_TICK_LABEL),
-                angle=90, # Start first axis at the top
+                angle=90,
                 nticks=max(3, int(radial_range_max_final / (1 if radial_range_max_final <=5 else 2) )) if radial_range_max_final > 0 else 3 ,
                 showticklabels=True, layer='below traces'
             ),
