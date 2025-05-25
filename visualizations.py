@@ -8,7 +8,7 @@ from typing import List, Dict, Optional, Any, Union
 import logging
 
 logger = logging.getLogger(__name__)
-# EPSILON is now defined in config.py to be accessible globally if needed, or can be defined here.
+# EPSILON is now defined in config.py to be accessible globally if needed.
 # Using config.EPSILON where appropriate.
 
 # --- Helper to get localized text (Original) ---
@@ -45,7 +45,7 @@ def get_semaforo_color(status: Optional[str]) -> str:
     return config.COLOR_TEXT_SECONDARY
 
 
-# --- Centralized Layout Helper ---
+# --- Centralized Layout Helper (Corrected) ---
 def _apply_standard_layout(fig: go.Figure,
                            lang: str,
                            title_text_direct: str, # Expects already translated/formatted title
@@ -70,44 +70,52 @@ def _apply_standard_layout(fig: go.Figure,
         "hoverlabel": dict(
             bgcolor=config.COLOR_HOVER_LABEL_BACKGROUND,
             font_size=config.FONT_SIZE_HOVER_LABEL,
-            bordercolor=config.COLOR_TEXT_SECONDARY, # Less prominent border for hover
+            bordercolor=config.COLOR_TEXT_SECONDARY,
             namelength=-1
         ),
         "margin": margin_params if margin_params is not None else config.DEFAULT_CHART_MARGINS,
+        "xaxis": {}, # Initialize xaxis and yaxis dictionaries
+        "yaxis": {}
     }
 
     if x_axis_title_key:
-        layout_settings["xaxis_title_text"] = get_lang_text(lang, x_axis_title_key, x_axis_title_key)
+        layout_settings["xaxis"]["title_text"] = get_lang_text(lang, x_axis_title_key, x_axis_title_key)
     if y_axis_title_key:
-        layout_settings["yaxis_title_text"] = get_lang_text(lang, y_axis_title_key, y_axis_title_key)
+        layout_settings["yaxis"]["title_text"] = get_lang_text(lang, y_axis_title_key, y_axis_title_key)
 
     # Default legend styling from config, merged with specific params
-    final_legend_settings = {}
-    if legend_params is not None and legend_params.get("showlegend", True): # If showlegend is True or not specified but other params are
-        final_legend_settings = { # Base defaults for legend
-            "orientation": "h", "yanchor": "top", "y": -0.15, # Default to bottom, overridden by specific calls
-            "xanchor": "center", "x": 0.5,
-            "font_size": config.FONT_SIZE_LEGEND,
-            "traceorder": "normal",
-            "bgcolor": config.COLOR_LEGEND_BACKGROUND,
-            "bordercolor": config.COLOR_LEGEND_BORDER,
-            "borderwidth": 1
-        }
-        final_legend_settings.update(legend_params) # Specific overrides take precedence
-        layout_settings["legend"] = final_legend_settings
-        layout_settings["showlegend"] = True # Explicitly set
-    elif legend_params is not None and not legend_params.get("showlegend", True):
-         layout_settings["showlegend"] = False # Explicitly hide if showlegend: False is passed
+    show_legend_flag = True # Default to show legend unless explicitly told not to
+    if legend_params is not None:
+        if "showlegend" in legend_params: # Check if showlegend is explicitly passed
+            show_legend_flag = legend_params.pop("showlegend") # Use and remove it from params
+
+        if show_legend_flag: # Only configure legend if it's meant to be shown
+            final_legend_settings = { # Base defaults for legend
+                "orientation": "h", "yanchor": "top", "y": -0.15,
+                "xanchor": "center", "x": 0.5,
+                "font_size": config.FONT_SIZE_LEGEND,
+                "traceorder": "normal",
+                "bgcolor": config.COLOR_LEGEND_BACKGROUND,
+                "bordercolor": config.COLOR_LEGEND_BORDER,
+                "borderwidth": 1
+            }
+            final_legend_settings.update(legend_params) # Specific overrides take precedence
+            layout_settings["legend"] = final_legend_settings
+
+    layout_settings["showlegend"] = show_legend_flag # Set the master showlegend flag
+
 
     if extra_layout_updates:
-        # Simple way to merge, prioritizing keys from extra_layout_updates for top-level dicts like 'title'
         for key, val in extra_layout_updates.items():
             if isinstance(val, dict) and isinstance(layout_settings.get(key), dict):
-                layout_settings[key].update(val) # Merge nested dicts (e.g. for title font overrides)
+                current_sub_dict = layout_settings.get(key, {})
+                current_sub_dict.update(val) # Deep merge for nested dicts
+                layout_settings[key] = current_sub_dict
             else:
                 layout_settings[key] = val # Replace or add other keys
-
+                
     fig.update_layout(**layout_settings)
+
 
 # --- Standardized No Data Figure ---
 def _create_no_data_figure(lang: str, title_key_for_base: str,
@@ -124,9 +132,9 @@ def _create_no_data_figure(lang: str, title_key_for_base: str,
         extra_layout_updates={
             "title": dict(x=0.5, y=0.9, xanchor='center', yanchor='middle', # Centered title for no-data
                           font_size=config.FONT_SIZE_TITLE_DEFAULT - 2), # Slightly smaller
-            "xaxis_visible": False, # Completely hide x-axis
-            "yaxis_visible": False, # Completely hide y-axis
-            "showlegend": False,
+            "xaxis_visible": False,
+            "yaxis_visible": False,
+            "showlegend": False, # Explicitly no legend
             "plot_bgcolor": config.COLOR_PAPER_BACKGROUND, # Use paper_bgcolor to make it flat
         }
     )
@@ -134,12 +142,12 @@ def _create_no_data_figure(lang: str, title_key_for_base: str,
         text=no_data_message,
         xref="paper", yref="paper", x=0.5, y=0.5,
         showarrow=False,
-        font=dict(size=config.FONT_SIZE_BODY_DEFAULT + 2, # Slightly larger body text for message
+        font=dict(size=config.FONT_SIZE_BODY_DEFAULT + 2,
                   color=config.COLOR_TEXT_SECONDARY)
     )
     return fig
 
-# --- KPI Gauge Visualization (SME Platinum Edition) ---
+# --- KPI Gauge Visualization ---
 def create_kpi_gauge(value: Optional[Union[int, float, np.number]], title_key: str, lang: str,
                      unit: str = "%", higher_is_worse: bool = True,
                      threshold_good: Optional[Union[int, float, np.number]] = None,
@@ -183,17 +191,17 @@ def create_kpi_gauge(value: Optional[Union[int, float, np.number]], title_key: s
         if valid_ref_points_for_max: val_candidates_for_max.append(max(valid_ref_points_for_max) * 1.25)
         if not valid_ref_points_for_max and (not pd.notna(current_val_numeric) or abs(current_val_numeric) < config.EPSILON):
              val_candidates_for_max.append(100.0 if unit == "%" else 10.0)
-        axis_max_val = max(val_candidates_for_max) if val_candidates_for_max else 100.0 # Default to 100 if list empty
-        if axis_max_val <= (current_val_numeric if pd.notna(current_val_numeric) else 0.0): # current_val_numeric can be negative
+        axis_max_val = max(val_candidates_for_max) if val_candidates_for_max else 100.0
+        if axis_max_val <= (abs(current_val_numeric) if pd.notna(current_val_numeric) else 0.0):
             axis_max_val = (abs(current_val_numeric) * 1.1) if pd.notna(current_val_numeric) and abs(current_val_numeric) > config.EPSILON else (axis_max_val * 1.1 or 10.0)
-        if axis_max_val <= config.EPSILON: axis_max_val = 10.0 # Ensure a positive max
+        if axis_max_val <= config.EPSILON: axis_max_val = 10.0
 
     gauge_steps = []
     num_t_good = float(threshold_good) if threshold_good is not None and pd.notna(threshold_good) else None
     num_t_warn = float(threshold_warning) if threshold_warning is not None and pd.notna(threshold_warning) else None
     if num_t_good is not None and num_t_warn is not None:
-        if higher_is_worse and num_t_warn < num_t_good: num_t_warn = num_t_good # warning must be >= good
-        if not higher_is_worse and num_t_warn > num_t_good: num_t_warn = num_t_good # warning must be <= good
+        if higher_is_worse and num_t_warn < num_t_good: num_t_warn = num_t_good
+        if not higher_is_worse and num_t_warn > num_t_good: num_t_warn = num_t_good
 
     range_start = 0.0
     if higher_is_worse:
@@ -252,7 +260,7 @@ def create_kpi_gauge(value: Optional[Union[int, float, np.number]], title_key: s
         paper_bgcolor=config.COLOR_PAPER_BACKGROUND)
     return fig
 
-# --- Trend Chart Visualization (SME Platinum) ---
+# --- Trend Chart Visualization ---
 def create_trend_chart(df_input: pd.DataFrame, date_col: str,
                        value_cols_map: Dict[str, str], title_key: str, lang: str,
                        y_axis_title_key: str = "value_axis_label", x_axis_title_key: str = "date_time_axis_label",
@@ -267,8 +275,8 @@ def create_trend_chart(df_input: pd.DataFrame, date_col: str,
         return _create_no_data_figure(lang, title_key)
 
     fig = go.Figure()
-    colors = config.COLOR_SCHEME_CATEGORICAL_SET2
-    y_title_str = get_lang_text(lang, y_axis_title_key, "Value") # For hovertemplate
+    colors = config.COLOR_SCHEME_CATEGORICAL_SET2 # Ensure this is defined in config.py
+    y_title_str = get_lang_text(lang, y_axis_title_key, "Value")
 
     plotted_actual_cols = []
     for i, (legend_key, actual_col) in enumerate(value_cols_map.items()):
@@ -299,52 +307,63 @@ def create_trend_chart(df_input: pd.DataFrame, date_col: str,
         legend_key = next((k for k,v in value_cols_map.items() if v == actual_col), actual_col)
         series_name = get_lang_text(lang, legend_key, actual_col.replace('_',' ').title())
         color_for_annotations = colors[i % len(colors)]
+        y_fmt = y_axis_format_str if y_axis_format_str else ",.1f" # Consistent formatting
         if show_average_line:
             avg = df[actual_col].mean()
             if pd.notna(avg):
                 fig.add_hline(y=avg, line_dash="dot", line_color=color_for_annotations, opacity=0.6,
-                              annotation_text=f"{get_lang_text(lang, 'average_label')} {series_name}: {avg:{y_fmt if y_fmt else ',.1f'}}",
+                              annotation_text=f"{get_lang_text(lang, 'average_label')} {series_name}: {avg:{y_fmt}}",
                               annotation_position="bottom right" if i%2==0 else "top left",
                               annotation_font=dict(size=config.FONT_SIZE_ANNOTATION_SMALL, color=color_for_annotations),
                               annotation_bgcolor=config.COLOR_ANNOTATION_BG)
         if target_value_map and actual_col in target_value_map and pd.notna(target_value_map[actual_col]):
             target = target_value_map[actual_col]
             fig.add_hline(y=target, line_dash="solid", line_color=config.COLOR_TARGET_LINE, line_width=1.5, opacity=1.0,
-                          annotation_text=f"{get_lang_text(lang, 'target_label')} {series_name}: {target:{y_fmt if y_fmt else ',.1f'}}",
+                          annotation_text=f"{get_lang_text(lang, 'target_label')} {series_name}: {target:{y_fmt}}",
                           annotation_position="top left" if i%2==0 else "bottom right",
                           annotation_font=dict(size=config.FONT_SIZE_ANNOTATION_TARGET, color=config.COLOR_TARGET_LINE,
                                                family=config.FONT_FAMILY_TARGET_ANNOTATION),
                           annotation_bgcolor=config.COLOR_ANNOTATION_BG)
 
-    title_text = get_lang_text(lang, title_key)
+    title_text_direct = get_lang_text(lang, title_key) # Direct text for title
     margin_params = dict(l=60, r=30, t=100, b=50 if not (len(df[date_col].unique()) > 15) else 80)
-    legend_params_trend = {"orientation": "h", "yanchor": "top", "y": 1.09, "xanchor": "right", "x": 1, "legend_title_text":""}
+    legend_params_trend = {
+        "showlegend": True,
+        "orientation": "h",
+        "yanchor": "top",
+        "y": 1.09,
+        "xanchor": "right",
+        "x": 1,
+        "title_text": "" # This is for legend title, usually empty. Main title from title_key
+    }
 
-    _apply_standard_layout(fig, lang, title_text_direct=title_text,
+    _apply_standard_layout(fig, lang, title_text_direct=title_text_direct,
                            x_axis_title_key=x_axis_title_key, y_axis_title_key=y_axis_title_key,
                            legend_params=legend_params_trend, margin_params=margin_params)
 
+    # Chart-specific layout updates (properties not covered by _apply_standard_layout or needing override)
     fig.update_layout(
-        xaxis=dict(showgrid=True, gridcolor=config.COLOR_GRID_SECONDARY, type='date',
-                   showspikes=True, spikemode='across+marker', spikesnap='cursor', spikethickness=1,
-                   spikedash='solid', spikecolor=config.COLOR_SPIKE_LINE),
-        yaxis=dict(showgrid=True, gridcolor=config.COLOR_GRID_PRIMARY,
-                   tickformat=(y_axis_format_str if y_axis_format_str else None)),
+        xaxis_gridcolor=config.COLOR_GRID_SECONDARY,
+        yaxis_gridcolor=config.COLOR_GRID_PRIMARY,
+        yaxis_tickformat=(y_axis_format_str if y_axis_format_str else None),
     )
-    fig.update_xaxes(
-         rangeslider_visible= len(df[date_col].unique()) > 15,
-         rangeselector=dict(
-             buttons=list([
+    fig.update_xaxes( # Use update_xaxes for specific axis properties
+        type='date',
+        showspikes=True, spikemode='across+marker', spikesnap='cursor', spikethickness=1,
+        spikedash='solid', spikecolor=config.COLOR_SPIKE_LINE,
+        rangeslider_visible= len(df[date_col].unique()) > 15,
+        rangeselector=dict(
+            buttons=list([
                  dict(count=1, label="1M", step="month", stepmode="todate" if not df.empty and date_col in df.columns and df[date_col].max() > pd.Timestamp.now() - pd.DateOffset(months=1) else "backward"),
                  dict(count=3, label="3M", step="month", stepmode="backward"), dict(count=6, label="6M", step="month", stepmode="backward"),
                  dict(count=1, label="YTD", step="year", stepmode="todate"), dict(count=1, label=get_lang_text(lang, "1y_range_label", "1Y"), step="year", stepmode="backward"),
                  dict(step="all", label=get_lang_text(lang, "all_range_label", "All"))
-             ]),
-             font_size=config.FONT_SIZE_RANGESELECTOR_BUTTONS,
-             bgcolor=config.COLOR_RANGESELECTOR_BACKGROUND,
-             borderwidth=1, bordercolor=config.COLOR_RANGESELECTOR_BORDER,
-             y=1.18, x=0.01, xanchor='left'
-         )
+            ]),
+            font_size=config.FONT_SIZE_RANGESELECTOR_BUTTONS,
+            bgcolor=config.COLOR_RANGESELECTOR_BACKGROUND,
+            borderwidth=1, bordercolor=config.COLOR_RANGESELECTOR_BORDER,
+            y=1.18, x=0.01, xanchor='left'
+        )
     )
     return fig
 
@@ -370,7 +389,7 @@ def create_comparison_bar_chart(df_input: pd.DataFrame, x_col: str,
 
     try:
         fig = px.bar(df, x=x_col, y=actual_y_cols_for_plotting,
-                     title=None, # Handled by _apply_standard_layout
+                     title=None,
                      barmode=barmode,
                      color_discrete_sequence=px.colors.qualitative.Pastel if barmode == 'stack' else config.COLOR_SCHEME_CATEGORICAL,
                      labels=plotly_bar_labels_arg,
@@ -410,30 +429,37 @@ def create_comparison_bar_chart(df_input: pd.DataFrame, x_col: str,
         annotations_list_total = [
             dict(x=row[x_col], y=row['_total_stacked_'],
                  text=f"{row['_total_stacked_']:{final_fmt_spec}}",
-                 font=dict(size=config.FONT_SIZE_ANNOTATION_SMALL, color=config.COLOR_TARGET_LINE), # Example color
+                 font=dict(size=config.FONT_SIZE_ANNOTATION_SMALL, color=config.COLOR_TARGET_LINE),
                  showarrow=False, yanchor='bottom', yshift=4, xanchor='center')
             for _, row in df_total_sum_calc.iterrows() if pd.notna(row['_total_stacked_'])
         ]
         if annotations_list_total:
-            current_layout_annotations = list(fig.layout.annotations or ())
-            fig.update_layout(annotations=current_layout_annotations + annotations_list_total)
+            # Add to existing annotations (if any from base layout or future needs)
+            # No annotations usually set by _apply_standard_layout, safe for now
+            fig.update_layout(annotations=list(fig.layout.annotations or []) + annotations_list_total)
+
 
     title_text_direct = get_lang_text(lang, title_key)
     margin_params = dict(l=50, r=20, t=60, b=100 if len(actual_y_cols_for_plotting)>2 else 70)
-    legend_params_bar = {"orientation":"h",
-                         "yanchor":"top", "y":-0.2 if len(actual_y_cols_for_plotting)>3 else -0.15,
-                         "xanchor":"center", "x":0.5,
-                         "font_size":config.FONT_SIZE_LEGEND, # Uses general legend font size
-                         "legend_title_text":""}
+    legend_params_bar = {
+        "showlegend": True,
+        "orientation":"h",
+        "yanchor":"top", "y":-0.2 if len(actual_y_cols_for_plotting)>3 else -0.15,
+        "xanchor":"center", "x":0.5,
+        # font_size will use default from config via _apply_standard_layout
+        "title_text":""
+    }
 
     _apply_standard_layout(fig, lang, title_text_direct=title_text_direct,
                            x_axis_title_key=x_axis_title_key, y_axis_title_key=y_axis_title_key,
                            legend_params=legend_params_bar, margin_params=margin_params)
 
-    fig.update_layout(
+    fig.update_layout( # Chart-specific layout adjustments
         xaxis_tickangle=-30 if not df.empty and df[x_col].nunique() > 7 else 0,
-        yaxis=dict(showgrid=True, gridcolor=config.COLOR_GRID_PRIMARY),
-        xaxis=dict(showgrid=False, type='category', linecolor=config.COLOR_AXIS_LINE),
+        yaxis_gridcolor=config.COLOR_GRID_PRIMARY,
+        xaxis_type='category', # Already default for px.bar but explicit
+        xaxis_showgrid=False, # Usually no grid for categorical x-axis
+        xaxis_linecolor=config.COLOR_AXIS_LINE,
         bargap=0.2,
         bargroupgap=0.05 if barmode == 'group' else 0,
     )
@@ -493,24 +519,23 @@ def display_metric_card(st_object, label_key: str, value: Optional[Union[int, fl
                 elif delta_absolute_val < -config.EPSILON: delta_color_str = "inverse" if higher_is_better else "normal"
                 else: delta_color_str = "off"
 
-        # Determine status based on higher_is_worse perspective for thresholds
-        status_logic_higher_is_worse = not higher_is_better if higher_is_better is not None else True # Default to True for safety
+        status_logic_higher_is_worse = not higher_is_better if higher_is_better is not None else True
         current_status_text = get_status_by_thresholds(val_raw_float, status_logic_higher_is_worse, threshold_good, threshold_warning)
 
         if current_status_text == "good": status_icon_str = "✅ "
         elif current_status_text == "warning": status_icon_str = "⚠️ "
         elif current_status_text == "critical": status_icon_str = "❗ "
-        elif target_value is not None and higher_is_better is not None and pd.notna(target_value): # Check against target
+        elif target_value is not None and higher_is_better is not None and pd.notna(target_value):
             target_float_comp = float(target_value)
-            if (higher_is_better and val_raw_float >= target_float_comp) or \
-               (not higher_is_better and val_raw_float <= target_float_comp):
-                status_icon_str = "🎯 " # Target met or exceeded (in good direction)
-            else: status_icon_str = "" # Target not met
-        else: status_icon_str = "" # No specific status or target icon
+            if (higher_is_better and val_raw_float >= target_float_comp - config.EPSILON) or \
+               (not higher_is_better and val_raw_float <= target_float_comp + config.EPSILON): # Added EPSILON for float comparison
+                status_icon_str = "🎯 "
+            else: status_icon_str = ""
+        else: status_icon_str = ""
 
     st_object.metric(label=status_icon_str + label_text_orig, value=val_display_str, delta=delta_text_str, delta_color=delta_color_str, help=help_text_final_str)
 
-# --- Radar Chart Visualization (SME Platinum) ---
+# --- Radar Chart Visualization ---
 def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: str, values_col: str,
                                  title_key: str, lang: str, group_col: Optional[str] = None,
                                  range_max_override: Optional[Union[int, float]] = None,
@@ -529,13 +554,13 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
     valid_r_vals_radar = [float(v) for v in all_r_vals_radar if isinstance(v, (int,float)) and pd.notna(v)]
     max_data_val_for_radar_range = max(valid_r_vals_radar) if valid_r_vals_radar else 0.0
 
-    default_max_scale_radar = config.ENGAGEMENT_RADAR_DIM_SCALE_MAX # From config
+    default_max_scale_radar = config.ENGAGEMENT_RADAR_DIM_SCALE_MAX
     if not (isinstance(default_max_scale_radar, (int, float)) and pd.notna(default_max_scale_radar)):
-        default_max_scale_radar = 5.0 # Hard fallback
+        default_max_scale_radar = 5.0
 
     radial_range_max_final = float(range_max_override) if range_max_override is not None and pd.notna(range_max_override) else \
                              (max_data_val_for_radar_range * 1.25 if max_data_val_for_radar_range > config.EPSILON else default_max_scale_radar)
-    radial_range_max_final = max(radial_range_max_final, 1.0) # Ensure at least 1.0
+    radial_range_max_final = max(radial_range_max_final, 1.0)
 
     fig = go.Figure()
     colors_list_radar = config.COLOR_SCHEME_RADAR_DEFAULT
@@ -570,13 +595,16 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
     show_legend_final_radar = has_groups_on_radar or (target_values_map and plot_data_exists)
 
     title_text_direct = get_lang_text(lang, title_key)
-    margin_params = dict(l=30, r=30, t=50, b=70) # Radar charts might need specific margins
-    legend_params_radar = {"orientation":"h", "yanchor":"top", "y":-0.15, "xanchor":"center", "x":0.5,
-                           "font_size":config.FONT_SIZE_LEGEND,
-                           "showlegend": show_legend_final_radar, "itemsizing":'constant'}
+    margin_params = dict(l=30, r=30, t=50, b=70)
+    legend_params_radar = {
+        "showlegend": show_legend_final_radar, # Control legend visibility
+        "orientation":"h", "yanchor":"top", "y":-0.15, "xanchor":"center", "x":0.5,
+        "itemsizing":'constant' # Plotly default, explicit for clarity
+        # font_size will use default from _apply_standard_layout via config.FONT_SIZE_LEGEND
+    }
     _apply_standard_layout(fig, lang, title_text_direct=title_text_direct,
                            legend_params=legend_params_radar, margin_params=margin_params,
-                           extra_layout_updates={"title": {"x":0.5, "xanchor":"center"}}) # Center title for radar
+                           extra_layout_updates={"title": {"x":0.5, "xanchor":"center"}}) # Center radar title
 
     fig.update_layout(
         polar=dict(bgcolor=config.COLOR_RADAR_POLAR_BACKGROUND,
@@ -589,11 +617,11 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
                                     gridcolor=config.COLOR_RADAR_ANGULAR_GRID_LINE,
                                     tickfont_size=config.FONT_SIZE_RADAR_ANGULAR_TICK, direction="clockwise",
                                     showticklabels=True, layer='below traces')),
-        plot_bgcolor=config.COLOR_PLOT_BACKGROUND, # Consistent with general plot bg
+        # plot_bgcolor is already set by _apply_standard_layout
     )
     return fig
 
-# --- Stress Semáforo Visual (SME Platinum - Corrected title property) ---
+# --- Stress Semáforo Visual ---
 def create_stress_semaforo_visual(stress_level_value: Optional[Union[int, float, np.number]], lang: str,
                                   scale_max: float = config.STRESS_LEVEL_PSYCHOSOCIAL["max_scale"]) -> go.Figure:
     display_num_stress, color_for_status_s, text_for_status_s = None, config.COLOR_TEXT_SECONDARY, get_lang_text(lang, 'status_na_label')
