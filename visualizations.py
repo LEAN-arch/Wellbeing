@@ -70,34 +70,26 @@ def _apply_standard_layout(fig: go.Figure,
             namelength=-1
         ),
         "margin": margin_params if margin_params is not None else config.DEFAULT_CHART_MARGINS,
-        # Initialize xaxis and yaxis as empty dicts to allow for title_text to be added
-        # or for other properties to be merged safely via extra_layout_updates
         "xaxis": {},
         "yaxis": {}
     }
 
     if x_axis_title_key:
-        # Plotly expects axis titles under xaxis.title.text or yaxis.title.text
-        # Initialize if not present to avoid overwriting other xaxis settings
-        if "title" not in layout_settings["xaxis"]:
+        if "title" not in layout_settings["xaxis"]: # Ensure title dict exists
             layout_settings["xaxis"]["title"] = {}
         layout_settings["xaxis"]["title"]["text"] = get_lang_text(lang, x_axis_title_key, x_axis_title_key)
     if y_axis_title_key:
-        if "title" not in layout_settings["yaxis"]:
+        if "title" not in layout_settings["yaxis"]: # Ensure title dict exists
             layout_settings["yaxis"]["title"] = {}
         layout_settings["yaxis"]["title"]["text"] = get_lang_text(lang, y_axis_title_key, y_axis_title_key)
 
-
-    # Default legend styling from config, merged with specific params
-    show_legend_flag = True # Default to show legend unless explicitly told not to
+    show_legend_flag = True
     if legend_params is not None:
-        # Pop 'showlegend' if it exists, to handle it separately and not pass it into final_legend_settings
         if "showlegend" in legend_params:
             show_legend_flag = legend_params.pop("showlegend")
-
-        if show_legend_flag: # Only configure legend if it's meant to be shown
-            final_legend_settings = { # Base defaults for legend
-                "orientation": "h", "yanchor": "top", "y": -0.15, # Default to bottom, may be overridden
+        if show_legend_flag:
+            final_legend_settings = {
+                "orientation": "h", "yanchor": "top", "y": -0.15,
                 "xanchor": "center", "x": 0.5,
                 "font_size": config.FONT_SIZE_LEGEND,
                 "traceorder": "normal",
@@ -105,27 +97,23 @@ def _apply_standard_layout(fig: go.Figure,
                 "bordercolor": config.COLOR_LEGEND_BORDER,
                 "borderwidth": 1
             }
-            # legend_params now contains only overrides/additions to the defaults
             final_legend_settings.update(legend_params)
             layout_settings["legend"] = final_legend_settings
-
-    layout_settings["showlegend"] = show_legend_flag # Set the master showlegend flag
-
+    layout_settings["showlegend"] = show_legend_flag
 
     if extra_layout_updates:
         for key, val in extra_layout_updates.items():
             if isinstance(val, dict) and isinstance(layout_settings.get(key), dict):
                 current_sub_dict = layout_settings.get(key, {})
-                current_sub_dict.update(val) # Deep merge for nested dicts
+                current_sub_dict.update(val)
                 layout_settings[key] = current_sub_dict
             else:
-                layout_settings[key] = val # Replace or add other keys
+                layout_settings[key] = val
     try:
         fig.update_layout(**layout_settings)
     except Exception as e:
         logger.error(f"Error applying layout settings in _apply_standard_layout: {e}")
-        logger.error(f"Layout settings dump: {layout_settings}")
-        # Optionally re-raise or handle more gracefully
+        logger.error(f"Layout settings dump for problematic chart ({title_text_direct}): {layout_settings}")
         raise
 
 
@@ -317,16 +305,19 @@ def create_trend_chart(df_input: pd.DataFrame, date_col: str,
     _apply_standard_layout(fig, lang, title_text_direct=title_text_direct,
                            x_axis_title_key=x_axis_title_key, y_axis_title_key=y_axis_title_key,
                            legend_params=legend_params_trend, margin_params=margin_params)
-    fig.update_layout(
+    fig.update_layout( # Specific updates for this chart type, applied after _apply_standard_layout
         xaxis_gridcolor=config.COLOR_GRID_SECONDARY,
         yaxis_gridcolor=config.COLOR_GRID_PRIMARY,
         yaxis_tickformat=(y_axis_format_str if y_axis_format_str else None),
-    )
-    fig.update_xaxes(
-         type='date', showspikes=True, spikemode='across+marker', spikesnap='cursor', spikethickness=1,
-         spikedash='solid', spikecolor=config.COLOR_SPIKE_LINE,
-         rangeslider_visible= len(df[date_col].unique()) > 15,
-         rangeselector=dict(
+        xaxis_type='date', # Ensures it's treated as date for Plotly features
+        xaxis_showspikes=True,
+        xaxis_spikemode='across+marker',
+        xaxis_spikesnap='cursor',
+        xaxis_spikethickness=1,
+        xaxis_spikedash='solid',
+        xaxis_spikecolor=config.COLOR_SPIKE_LINE,
+        xaxis_rangeslider_visible=len(df[date_col].unique()) > 15,
+        xaxis_rangeselector=dict(
              buttons=list([
                  dict(count=1, label="1M", step="month", stepmode="todate" if not df.empty and date_col in df.columns and df[date_col].max() > pd.Timestamp.now() - pd.DateOffset(months=1) else "backward"),
                  dict(count=3, label="3M", step="month", stepmode="backward"), dict(count=6, label="6M", step="month", stepmode="backward"),
@@ -337,7 +328,7 @@ def create_trend_chart(df_input: pd.DataFrame, date_col: str,
              bgcolor=config.COLOR_RANGESELECTOR_BACKGROUND,
              borderwidth=1, bordercolor=config.COLOR_RANGESELECTOR_BORDER,
              y=1.18, x=0.01, xanchor='left'
-         )
+        )
     )
     return fig
 
@@ -510,45 +501,32 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
                 primary_group_name = matching_groups[0] # Use the actual name from data
                 break
 
-    plotted_groups_count = 0 # To cycle through colors_list_radar correctly
+    plotted_groups_count = 0
 
     if has_groups_on_radar:
-        # Plot "ALL TEAM" or primary group first if identified
-        if primary_group_name:
-            group_data_radar_df = df_radar[df_radar[group_col] == primary_group_name]
+        group_names_to_plot = [g for g in df_radar[group_col].unique()] # Get unique groups in their original order
+        if primary_group_name and primary_group_name in group_names_to_plot:
+            group_names_to_plot.remove(primary_group_name)
+            group_names_to_plot.insert(0, primary_group_name) # Ensure primary group is plotted first
+
+        for name_grp_radar_plot in group_names_to_plot:
+            group_data_radar_df = df_radar[df_radar[group_col] == name_grp_radar_plot]
             if not group_data_radar_df.empty and not group_data_radar_df[values_col].dropna().empty:
                 plot_data_exists = True
                 current_grp_ordered_df = pd.DataFrame({categories_col: all_categories_ordered_list}).merge(
                     group_data_radar_df, on=categories_col, how='left').fillna({values_col: 0})
+
+                current_line_width = line_width + 0.5 if name_grp_radar_plot == primary_group_name else line_width
+                current_color = colors_list_radar[plotted_groups_count % len(colors_list_radar)]
+
                 fig.add_trace(go.Scatterpolar(
                     r=current_grp_ordered_df[values_col], theta=current_grp_ordered_df[categories_col],
-                    fill='toself', name=str(primary_group_name),
-                    line=dict(color=colors_list_radar[plotted_groups_count % len(colors_list_radar)], width=line_width + 0.5), # Slightly thicker
-                    fillcolor=colors_list_radar[plotted_groups_count % len(colors_list_radar)],
+                    fill='toself', name=str(name_grp_radar_plot),
+                    line=dict(color=current_color, width=current_line_width),
+                    fillcolor=current_color,
                     opacity=fill_opacity,
-                    hovertemplate='<b>%{theta}</b><br>' + f'{str(primary_group_name)}: %{{r:.1f}}<extra></extra>' ))
+                    hovertemplate='<b>%{theta}</b><br>' + f'{str(name_grp_radar_plot)}: %{{r:.1f}}<extra></extra>' ))
                 plotted_groups_count += 1
-
-        # Plot other groups
-        # Iterate through unique group names to maintain a somewhat consistent order if primary was plucked
-        # This relies on unique_groups preserving some original order if `groupby(sort=False)` is later used.
-        # For perfect original order minus primary, a list subtraction approach would be needed.
-        other_group_names = [g_name for g_name in df_radar[group_col].unique() if g_name != primary_group_name]
-
-        for name_grp_radar_plot in other_group_names:
-            group_data_radar_df = df_radar[df_radar[group_col] == name_grp_radar_plot] # Select data for this group
-            if not group_data_radar_df.empty and not group_data_radar_df[values_col].dropna().empty: plot_data_exists = True
-            current_grp_ordered_df = pd.DataFrame({categories_col: all_categories_ordered_list}).merge(
-                group_data_radar_df, on=categories_col, how='left').fillna({values_col: 0})
-            color_index = plotted_groups_count % len(colors_list_radar)
-            fig.add_trace(go.Scatterpolar(
-                r=current_grp_ordered_df[values_col], theta=current_grp_ordered_df[categories_col],
-                fill='toself', name=str(name_grp_radar_plot),
-                line=dict(color=colors_list_radar[color_index], width=line_width),
-                fillcolor=colors_list_radar[color_index],
-                opacity=fill_opacity,
-                hovertemplate='<b>%{theta}</b><br>' + f'{str(name_grp_radar_plot)}: %{{r:.1f}}<extra></extra>' ))
-            plotted_groups_count += 1
     else: # Single series
         if values_col in df_radar.columns and not df_radar[values_col].dropna().empty:
             plot_data_exists = True
@@ -572,14 +550,14 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
     show_legend_final_radar = has_groups_on_radar or (target_values_map and plot_data_exists)
 
     title_text_direct = get_lang_text(lang, title_key)
-    margin_params = dict(l=40, r=40, t=60, b=80 if show_legend_final_radar else 50)
+    margin_params = dict(l=40, r=40, t=60, b=80 if show_legend_final_radar else 50) # Increased bottom margin for legend
     legend_params_radar = {
         "showlegend": show_legend_final_radar,
-        "orientation":"h", "yanchor":"bottom", "y": -0.25, "xanchor":"center", "x":0.5,
+        "orientation":"h", "yanchor":"bottom", "y": -0.30, "xanchor":"center", "x":0.5, # Adjusted y for more space
         "font_size": config.FONT_SIZE_LEGEND,
         "itemsizing": 'constant',
         "title_text": get_lang_text(lang, "metrics_legend", "Legend") if has_groups_on_radar and show_legend_final_radar else "",
-        "tracegroupgap": 5
+        "tracegroupgap": 10 # Increased gap for better legend item separation
     }
     _apply_standard_layout(fig, lang, title_text_direct=title_text_direct,
                            legend_params=legend_params_radar, margin_params=margin_params,
@@ -593,8 +571,8 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
                 linecolor=config.COLOR_RADAR_AXIS_LINE,
                 gridcolor=config.COLOR_RADAR_GRID_LINE,
                 tickfont=dict(size=config.FONT_SIZE_RADAR_TICK, color=config.COLOR_RADAR_TICK_LABEL),
-                angle=90,
-                nticks=max(3, int(radial_range_max_final)) if radial_range_max_final <=5 else 5 ,
+                angle=90, # Start first axis at the top for standard radar orientation
+                nticks=max(3, int(radial_range_max_final / (1 if radial_range_max_final <=5 else 2) )) if radial_range_max_final > 0 else 3 ,
                 showticklabels=True, layer='below traces'
             ),
             angularaxis=dict(
