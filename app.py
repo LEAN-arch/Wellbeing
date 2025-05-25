@@ -183,13 +183,14 @@ if app_mode_selected == dashboard_nav_label_loc: # Load data and display dashboa
             # Format the target value for help text string replacement
             target_rot_fmt = config.STABILITY_ROTATION_RATE["target"]
             target_rot_str = f"{target_rot_fmt:.0f}" if target_rot_fmt % 1 == 0 else f"{target_rot_fmt:.1f}"
-            help_text_rot_final = _("rotation_rate_metric_help").format(target=target_rot_str)
-
+            # The help text KEY "rotation_rate_metric_help" already contains the placeholder {target}
+            # viz.display_metric_card will handle the .format() if "{target}" is in the help_text_key's value
+            
             viz.display_metric_card(st, "rotation_rate_gauge", avg_rotation_current, st.session_state.selected_lang_code, unit="%",
                                     higher_is_better=False, target_value=config.STABILITY_ROTATION_RATE["target"],
                                     threshold_good=config.STABILITY_ROTATION_RATE["good"],
                                     threshold_warning=config.STABILITY_ROTATION_RATE["warning"],
-                                    previous_value=prev_avg_rotation_val, help_text_key=help_text_rot_final) # Pass formatted help text directly
+                                    previous_value=prev_avg_rotation_val, help_text_key="rotation_rate_metric_help") # Pass key
             if pd.notna(avg_rotation_current):
                 st.plotly_chart(viz.create_kpi_gauge(
                     avg_rotation_current, "rotation_rate_gauge", st.session_state.selected_lang_code, unit="%", higher_is_worse=True,
@@ -208,16 +209,12 @@ if app_mode_selected == dashboard_nav_label_loc: # Load data and display dashboa
             value_retention = df_stability_filtered[actual_col_name_retention].mean() if actual_col_name_retention in df_stability_filtered.columns else float('nan')
             previous_value_retention = get_dummy_prev_val(value_retention, 0.03, True)
             with cols_metrics_stab[i+1]: # Place in subsequent columns
-                target_ret_fmt = config.STABILITY_RETENTION["good"]
-                target_ret_str = f"{target_ret_fmt:.0f}" if target_ret_fmt % 1 == 0 else f"{target_ret_fmt:.1f}"
-                help_text_ret_final = _("retention_metric_help").format(target=target_ret_str)
-
                 viz.display_metric_card(st, label_key_retention, value_retention, st.session_state.selected_lang_code, unit="%", higher_is_better=True,
                                         target_value=config.STABILITY_RETENTION["good"], 
                                         threshold_good=config.STABILITY_RETENTION["good"], 
-                                        threshold_warning=config.STABILITY_RETENTION["warning"], # Remember, for higher_is_better=True, warning is below good
+                                        threshold_warning=config.STABILITY_RETENTION["warning"],
                                         previous_value=previous_value_retention,
-                                        help_text_key=help_text_ret_final)
+                                        help_text_key="retention_metric_help") # Pass key
         st.markdown("<br>", unsafe_allow_html=True) # Add some space before the trend chart
 
         # Hires vs. Exits Trend Chart
@@ -238,9 +235,8 @@ if app_mode_selected == dashboard_nav_label_loc: # Load data and display dashboa
                     Exits_Total_Agg=(exits_actual_col_stability, 'sum')
                 ).reset_index()
                 
-                # Map uses TEXT_STRING keys for legend (e.g. "hires_label") to the *new aggregated column names*
                 map_for_stability_trend = {"hires_label": "Hires_Total_Agg", "exits_label": "Exits_Total_Agg"}
-                units_for_stability_trend = {"Hires_Total_Agg": "", "Exits_Total_Agg": ""} # Units defined by axis title
+                units_for_stability_trend = {"Hires_Total_Agg": "", "Exits_Total_Agg": ""}
                 
                 st.plotly_chart(viz.create_trend_chart(
                     agg_trend_stability, date_actual_col_stability, map_for_stability_trend, 
@@ -255,11 +251,11 @@ if app_mode_selected == dashboard_nav_label_loc: # Load data and display dashboa
         action_insights_stability = insights.generate_stability_insights(
             df_stability_filtered, 
             avg_rotation_current, 
-            agg_trend_stability if 'agg_trend_stability' in locals() and not agg_trend_stability.empty else pd.DataFrame(), # Pass valid DF
+            agg_trend_stability if 'agg_trend_stability' in locals() and not agg_trend_stability.empty else pd.DataFrame(),
             st.session_state.selected_lang_code
         )
         if action_insights_stability:
-            st.markdown("---") # Separator for insights section
+            st.markdown("---") 
             st.subheader(_("actionable_insights_title"))
             for insight_item_stability in action_insights_stability:
                 st.markdown(f"💡 {insight_item_stability}")
@@ -273,14 +269,14 @@ if app_mode_selected == dashboard_nav_label_loc: # Load data and display dashboa
     current_dwa_val = float('nan')
 
     if not df_safety_filtered.empty:
-        cols_layout_safety_main = st.columns([2, 1, 1]) # Bar Chart, Metric Card 1, Metric Card 2
+        cols_layout_safety_main = st.columns([2, 1, 1])
         month_col_name_safety = config.COLUMN_MAP.get("month", "month")
         incidents_col_name_safety = config.COLUMN_MAP.get("incidents", "incidents")
         near_misses_col_name_safety = config.COLUMN_MAP.get("near_misses", "near_misses")
         days_no_acc_col_name_safety = config.COLUMN_MAP.get("days_without_accidents", "days_without_accidents")
         active_alerts_col_name_safety = config.COLUMN_MAP.get("active_alerts", "active_alerts")
 
-        with cols_layout_safety_main[0]: # Bar Chart
+        with cols_layout_safety_main[0]: 
             if all(c in df_safety_filtered.columns for c in [month_col_name_safety, incidents_col_name_safety, near_misses_col_name_safety]):
                 summary_safety_df = df_safety_filtered.groupby(month_col_name_safety, as_index=False).agg(
                     Incidents_Sum_Agg=(incidents_col_name_safety, 'sum'), 
@@ -290,7 +286,7 @@ if app_mode_selected == dashboard_nav_label_loc: # Load data and display dashboa
                     month_order_cat_list = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
                     summary_safety_df[month_col_name_safety] = pd.Categorical(summary_safety_df[month_col_name_safety].astype(str), categories=month_order_cat_list, ordered=True)
                     summary_safety_df.sort_values(month_col_name_safety, inplace=True)
-                    summary_safety_df.dropna(subset=[month_col_name_safety], inplace=True) # If month couldn't be categorized
+                    summary_safety_df.dropna(subset=[month_col_name_safety], inplace=True)
                 except Exception: summary_safety_df.sort_values(by=month_col_name_safety, errors='ignore', inplace=True)
                 
                 if not summary_safety_df.empty:
@@ -300,30 +296,28 @@ if app_mode_selected == dashboard_nav_label_loc: # Load data and display dashboa
                         x_axis_title_key="month_axis_label", y_axis_title_key="count_label",
                         barmode='stack', show_total_for_stacked=True, data_label_format_str=".0f"
                     ), use_container_width=True)
-                    # Update total_inc_current_period for insights if summary_safety_df is not empty
                     if not summary_safety_df.empty: 
-                        total_inc_current_period = summary_safety_df['Incidents_Sum_Agg'].sum() # Sum over the period shown in chart
+                        total_inc_current_period = summary_safety_df['Incidents_Sum_Agg'].sum()
                 else: st.warning(_("no_data_incidents_near_misses"))
             else: st.warning(_("no_data_incidents_near_misses"))
         
         current_dwa_val = df_safety_filtered[days_no_acc_col_name_safety].max() if days_no_acc_col_name_safety in df_safety_filtered.columns else float('nan')
-        with cols_layout_safety_main[1]: # Days Without Accidents Metric Card
-            previous_dwa_value = get_dummy_prev_val(current_dwa_val, 0.1, variation_abs=10) # Use variation_abs for counts
+        with cols_layout_safety_main[1]:
+            previous_dwa_value = get_dummy_prev_val(current_dwa_val, 0.1, variation_abs=10)
             viz.display_metric_card(st, "days_without_accidents_metric", current_dwa_val, st.session_state.selected_lang_code, unit=" "+_("days_unit"),
                                    higher_is_better=True, help_text_key="days_no_incident_help",
                                    threshold_good=config.SAFETY_DAYS_NO_INCIDENTS["good"], 
                                    threshold_warning=config.SAFETY_DAYS_NO_INCIDENTS["warning"],
                                    previous_value=previous_dwa_value)
-        with cols_layout_safety_main[2]: # Active Safety Alerts Metric Card
+        with cols_layout_safety_main[2]: 
             active_alerts_current_val = df_safety_filtered[active_alerts_col_name_safety].sum() if active_alerts_col_name_safety in df_safety_filtered.columns else float('nan')
             previous_active_alerts_val = get_dummy_prev_val(active_alerts_current_val, 0.2, variation_abs=1)
-            previous_active_alerts_val = int(previous_active_alerts_val) if pd.notna(previous_active_alerts_val) else None # Ensure integer for count
+            previous_active_alerts_val = int(previous_active_alerts_val) if pd.notna(previous_active_alerts_val) else None
             viz.display_metric_card(st, "active_safety_alerts_metric", active_alerts_current_val, st.session_state.selected_lang_code, unit="",
-                                   higher_is_better=False, target_value=0, # Target is zero active alerts
+                                   higher_is_better=False, target_value=0, 
                                    threshold_good=0, threshold_warning=1, 
                                    previous_value=previous_active_alerts_val)
 
-        # Actionable Insights for Safety Pulse
         action_insights_safety_list = insights.generate_safety_insights(df_safety_filtered, current_dwa_val, total_inc_current_period, st.session_state.selected_lang_code)
         if action_insights_safety_list:
             st.markdown("---")
@@ -338,15 +332,13 @@ if app_mode_selected == dashboard_nav_label_loc: # Load data and display dashboa
 
     if not df_engagement_filtered.empty:
         cols_layout_engagement_main = st.columns([2,1]) 
-        with cols_layout_engagement_main[0]: # Radar Chart
+        with cols_layout_engagement_main[0]: 
             radar_data_points_engagement = []
             radar_targets_localized_eng_radar = {}
             
-            # Iterate through the conceptual keys defined in config.COLUMN_MAP["engagement_radar_dims_cols"]
             for conceptual_key_radar, actual_col_radar in config.COLUMN_MAP["engagement_radar_dims_cols"].items():
-                if actual_col_radar in df_engagement_filtered.columns: # Check if the actual column exists in the dataframe
+                if actual_col_radar in df_engagement_filtered.columns:
                     avg_score_radar = df_engagement_filtered[actual_col_radar].mean()
-                    # Get the display label key (e.g., 'initiative_label') using the conceptual_key_radar
                     label_key_for_display_radar = config.COLUMN_MAP["engagement_radar_dims_labels"].get(conceptual_key_radar, actual_col_radar)
                     display_name_for_radar = _(label_key_for_display_radar, actual_col_radar.replace('_', ' ').title())
                     
@@ -362,15 +354,15 @@ if app_mode_selected == dashboard_nav_label_loc: # Load data and display dashboa
                     target_values_map=radar_targets_localized_eng_radar, fill_opacity=0.4
                 ), use_container_width=True)
             elif any(config.COLUMN_MAP["engagement_radar_dims_cols"].get(k) in df_engagement_filtered.columns for k in config.COLUMN_MAP["engagement_radar_dims_cols"]):
-                 st.warning(_("no_data_radar")) # Data columns exist, but filtering resulted in no data for radar points
-            else: st.warning(_("no_data_radar_columns")) # Essential columns for radar are missing entirely
+                 st.warning(_("no_data_radar"))
+            else: st.warning(_("no_data_radar_columns"))
         
-        with cols_layout_engagement_main[1]: # Metric cards for engagement
-            kpis_engagement_config_list = [ # (column_map_key, label_key, unit, higher_is_better, threshold_config_dict, help_text_key)
+        with cols_layout_engagement_main[1]:
+            kpis_engagement_config_list = [
                 ("labor_climate_score", "labor_climate_score_metric", "", True, config.ENGAGEMENT_CLIMATE_SCORE, None),
                 ("enps_score", "enps_metric", "", True, config.ENGAGEMENT_ENPS, "enps_metric_help"),
                 ("participation_rate", "survey_participation_metric", "%", True, config.ENGAGEMENT_PARTICIPATION, None),
-                ("recognitions_count", "recognitions_count_metric", "", True, None, None) # No specific thresholds from config for count
+                ("recognitions_count", "recognitions_count_metric", "", True, None, None)
             ]
             
             for col_map_k_eng_card, label_k_eng_card, unit_eng_card, hib_eng_card, thresholds_eng_card_dict, help_k_eng_card in kpis_engagement_config_list:
@@ -385,33 +377,23 @@ if app_mode_selected == dashboard_nav_label_loc: # Load data and display dashboa
                         current_val_metric_eng_card = df_engagement_filtered[actual_col_name_eng_card].mean()
                 
                 prev_val_metric_eng_card = get_dummy_prev_val(current_val_metric_eng_card, 0.05, (unit_eng_card=="%"), 
-                                                             variation_abs=5 if is_count_metric_card_eng else None) # Adjust variation for counts
+                                                             variation_abs=5 if is_count_metric_card_eng else None)
                 
                 thresh_good_eng_card = thresholds_eng_card_dict.get("good") if thresholds_eng_card_dict else None
                 thresh_warn_eng_card = thresholds_eng_card_dict.get("warning") if thresholds_eng_card_dict else None
                 
-                # Format help text if target placeholder is present
-                help_text_formatted_card_eng = ""
-                if help_k_eng_card and thresh_good_eng_card is not None and "{target}" in _(help_k_eng_card, ""):
-                    target_fmt_eng_card = ".0f" if float(thresh_good_eng_card) % 1 == 0 else ".1f"
-                    help_text_formatted_card_eng = _(help_k_eng_card).format(target=f"{float(thresh_good_eng_card):{target_fmt_eng_card}}")
-                elif help_k_eng_card:
-                    help_text_formatted_card_eng = _(help_k_eng_card)
-
                 viz.display_metric_card(st, label_k_eng_card, current_val_metric_eng_card, st.session_state.selected_lang_code, unit=unit_eng_card, 
                                         higher_is_better=hib_eng_card, target_value=thresh_good_eng_card, 
                                         threshold_good=thresh_good_eng_card, threshold_warning=thresh_warn_eng_card,
-                                        previous_value=prev_val_metric_eng_card, help_text_key=help_text_formatted_card_eng)
+                                        previous_value=prev_val_metric_eng_card, help_text_key=help_k_eng_card) # Pass key
                 
-                # Store values for insights function
                 if col_map_k_eng_card == "enps_score": avg_enps_for_insight = current_val_metric_eng_card
                 if col_map_k_eng_card == "labor_climate_score": avg_climate_for_insight = current_val_metric_eng_card
                 if col_map_k_eng_card == "participation_rate": participation_for_insight = current_val_metric_eng_card
 
-        # Actionable Insights for Engagement Panel
         action_insights_engagement_list = insights.generate_engagement_insights(avg_enps_for_insight, avg_climate_for_insight, participation_for_insight, st.session_state.selected_lang_code)
         if action_insights_engagement_list:
-            st.markdown("---") # Separator
+            st.markdown("---")
             st.subheader(_("actionable_insights_title"))
             for insight_item_eng in action_insights_engagement_list: st.markdown(f"💡 {insight_item_eng}")
     else: st.info(_("no_data_available"))
@@ -434,17 +416,19 @@ if app_mode_selected == dashboard_nav_label_loc: # Load data and display dashboa
 
         avg_stress_current_val_for_insight = df_stress_filtered[stress_lvl_actual_col_stress].mean() if stress_lvl_actual_col_stress in df_stress_filtered.columns else float('nan')
         
-        with cols_layout_stress_page[0]: # Stress Semaforo (KPI Visual)
+        with cols_layout_stress_page[0]:
             st.subheader(_("overall_stress_indicator_title"))
             st.plotly_chart(viz.create_stress_semaforo_visual(
                 avg_stress_current_val_for_insight, st.session_state.selected_lang_code, scale_max=config.STRESS_LEVEL_PSYCHOSOCIAL["max_scale"]
             ), use_container_width=True)
-            # Dynamic help text for stress indicator
+            
             target_stress_indicator_help = config.STRESS_LEVEL_PSYCHOSOCIAL['low']
-            help_text_stress_indicator = _("stress_indicator_help").format(target=f"{target_stress_indicator_help:.1f}")
-            st.caption(help_text_stress_indicator)
+            # display_metric_card's help_text_key handles formatting for {target}
+            # For caption, we do it manually here or ensure no placeholders
+            help_text_stress_caption = _("stress_indicator_help").format(target=f"{target_stress_indicator_help:.1f}") if "{target}" in _("stress_indicator_help") else _("stress_indicator_help")
+            st.caption(help_text_stress_caption)
 
-        with cols_layout_stress_page[1]: # Shift Load Bar Chart
+        with cols_layout_stress_page[1]: 
             if all(c in df_stress_filtered.columns for c in [date_actual_col_stress_main, overtime_actual_col_stress, unfilled_actual_col_stress]):
                 df_shiftload_trend_stress = df_stress_filtered[[date_actual_col_stress_main, overtime_actual_col_stress, unfilled_actual_col_stress]].copy()
                 if not pd.api.types.is_datetime64_any_dtype(df_shiftload_trend_stress[date_actual_col_stress_main]):
@@ -455,7 +439,6 @@ if app_mode_selected == dashboard_nav_label_loc: # Load data and display dashboa
                 if not df_shiftload_trend_stress.empty:
                     sl_summary_agg_for_chart = df_shiftload_trend_stress.groupby(pd.Grouper(key=date_actual_col_stress_main, freq='M')).agg(
                        Overtime_Agg_Data=(overtime_actual_col_stress, 'sum'), Unfilled_Agg_Data=(unfilled_actual_col_stress, 'sum')).reset_index()
-                    # Map TEXT_STRING label keys to the NEW aggregated column names
                     map_sl_stress_bars_to_viz = {"overtime_label": "Overtime_Agg_Data", "unfilled_shifts_label": "Unfilled_Agg_Data"}
                     st.plotly_chart(viz.create_comparison_bar_chart(
                         sl_summary_agg_for_chart, date_actual_col_stress_main, map_sl_stress_bars_to_viz, "monthly_shift_load_chart_title", st.session_state.selected_lang_code,
@@ -464,9 +447,8 @@ if app_mode_selected == dashboard_nav_label_loc: # Load data and display dashboa
                     ), use_container_width=True)
                 else: st.warning(_("no_data_shift_load"))
             else: st.warning(_("no_data_shift_load"))
-        st.markdown("---") # Separator
+        st.markdown("---") 
 
-        # Workload vs Psych Signals Trend (Full Width below the two columns)
         if all(c in df_stress_filtered.columns for c in [date_actual_col_stress_main, workload_actual_col_stress, psych_actual_col_stress]):
             df_wp_ps_trend_stress_chart = df_stress_filtered[[date_actual_col_stress_main, workload_actual_col_stress, psych_actual_col_stress]].copy()
             if not pd.api.types.is_datetime64_any_dtype(df_wp_ps_trend_stress_chart[date_actual_col_stress_main]):
@@ -475,14 +457,13 @@ if app_mode_selected == dashboard_nav_label_loc: # Load data and display dashboa
             df_wp_ps_trend_stress_chart.sort_values(by=date_actual_col_stress_main, inplace=True)
             
             if not df_wp_ps_trend_stress_chart.empty:
-                # These specific aggregated column names MUST match what `insights.generate_stress_insights` expects for trend analysis
                 df_stress_trends_for_insight_func = df_wp_ps_trend_stress_chart.groupby(pd.Grouper(key=date_actual_col_stress_main, freq='M')).agg(
                     Workload_Avg=(workload_actual_col_stress, 'mean'), 
                     Psych_Signals_Avg=(psych_actual_col_stress, 'mean')
                 ).reset_index()
                 
                 map_wp_ps_stress_trend_to_viz = {"workload_perception_label": "Workload_Avg", "psychological_signals_label": "Psych_Signals_Avg"}
-                unit_map_wp_ps_stress_viz = {"Workload_Avg": "", "Psych_Signals_Avg": ""} # Units are scores, no specific suffix
+                unit_map_wp_ps_stress_viz = {"Workload_Avg": "", "Psych_Signals_Avg": ""}
                 st.plotly_chart(viz.create_trend_chart(
                     df_stress_trends_for_insight_func, date_actual_col_stress_main, map_wp_ps_stress_trend_to_viz, 
                     "workload_vs_psych_chart_title", st.session_state.selected_lang_code,
@@ -492,7 +473,6 @@ if app_mode_selected == dashboard_nav_label_loc: # Load data and display dashboa
             else: st.warning(_("no_data_workload_psych"))
         else: st.warning(_("no_data_workload_psych"))
 
-        # Actionable Insights for Stress panel
         action_insights_stress_list = insights.generate_stress_insights(avg_stress_current_val_for_insight, df_stress_trends_for_insight_func, st.session_state.selected_lang_code)
         if action_insights_stress_list:
             st.markdown("---")
@@ -504,13 +484,14 @@ if app_mode_selected == dashboard_nav_label_loc: # Load data and display dashboa
     # --- 5. Interactive Plant Map (Placeholder) ---
     st.header(_("plant_map_title"))
     st.markdown(config.PLACEHOLDER_TEXT_PLANT_MAP, unsafe_allow_html=True)
-    st.warning(_("This module is a placeholder for future development.", "Module currently in development."))
+    # Updated warning to use the localization helper
+    st.warning(_("This module is a placeholder for future development.", default_text_override="Module currently in development."))
     st.markdown("---")
 
     # --- 6. Predictive AI Insights (Placeholder) ---
     st.header(_("ai_insights_title"))
     st.markdown(config.PLACEHOLDER_TEXT_AI_INSIGHTS, unsafe_allow_html=True)
-    st.warning(_("This module is a placeholder for future development.", "Module currently in development."))
+    st.warning(_("This module is a placeholder for future development.", default_text_override="Module currently in development."))
     st.markdown("---")
 
 
@@ -520,73 +501,66 @@ elif app_mode_selected == glossary_nav_label_loc:
     st.markdown(_("glossary_intro"))
     st.markdown("---")
 
-    search_term_for_glossary_input = st.text_input(_("search_term_label"), key="glossary_search_text_field") # Unique key
+    search_term_for_glossary_input = st.text_input(_("search_term_label"), key="glossary_search_text_field") 
     
-    # GLOSSARY_TERMS imported from glossary_data.py
-    # Sort by the English term key for consistent display order
     sorted_glossary_data_from_file = dict(sorted(GLOSSARY_TERMS.items()))
 
     num_glossary_terms_displayed = 0
     if sorted_glossary_data_from_file:
         for term_key_english, definitions_for_term in sorted_glossary_data_from_file.items():
             display_this_term_in_glossary = True
-            if search_term_for_glossary_input: # Apply search filter if text is entered
+            if search_term_for_glossary_input: 
                 search_text_lower = search_term_for_glossary_input.lower()
                 match_in_english_key = search_text_lower in term_key_english.lower()
                 match_in_english_def = search_text_lower in definitions_for_term.get("EN", "").lower() if definitions_for_term.get("EN") else False
+                # Check Spanish definition only if it exists and the search term is not empty.
+                # Use .get(secondary_lang_key, "") to avoid KeyError if definition not present for ES.
                 match_in_spanish_def = search_text_lower in definitions_for_term.get("ES", "").lower() if definitions_for_term.get("ES") else False
                 if not (match_in_english_key or match_in_english_def or match_in_spanish_def):
                     display_this_term_in_glossary = False
             
             if display_this_term_in_glossary:
                 num_glossary_terms_displayed +=1
-                # Display term in English as the expander header (it's the key)
-                with st.expander(term_key_english, expanded=(search_term_for_glossary_input != "")): # Expand if search term exists
-                    primary_display_lang_key = st.session_state.selected_lang_code.upper() # 'EN' or 'ES'
+                with st.expander(term_key_english, expanded=(search_term_for_glossary_input != "")): 
+                    primary_display_lang_key = st.session_state.selected_lang_code.upper()
                     secondary_display_lang_key = "ES" if primary_display_lang_key == "EN" else "EN"
 
-                    # Display definition in the primary selected language
                     if primary_display_lang_key in definitions_for_term and definitions_for_term[primary_display_lang_key]:
-                        st.markdown(f"**{_('definition_label')}:**") # Uses current_lang_texts for "Definition"
+                        st.markdown(f"**{_('definition_label')}:**") 
                         st.markdown(definitions_for_term[primary_display_lang_key])
                     
-                    # Optionally display the definition in the other language as a caption
                     if secondary_display_lang_key in definitions_for_term and definitions_for_term[secondary_display_lang_key]:
-                         # Add a separator if primary definition was shown
                          if primary_display_lang_key in definitions_for_term and definitions_for_term[primary_display_lang_key]:
                              st.markdown("---")
-                         # Get the full name of the secondary language (e.g., "Español")
                          secondary_lang_full_name = _(f"language_name_full_{secondary_display_lang_key.upper()}", secondary_display_lang_key)
                          st.caption(f"*{secondary_lang_full_name}:* {definitions_for_term[secondary_display_lang_key]}")
-                    # Fallback if primary language def is missing but English exists
-                    elif "EN" in definitions_for_term and definitions_for_term["EN"] and primary_display_lang_key != "EN":
+                    elif "EN" in definitions_for_term and definitions_for_term["EN"] and primary_display_lang_key != "EN": # Fallback to EN if primary lang (ES) def is missing
                         st.markdown(f"**{config.TEXT_STRINGS['EN'].get('definition_label', 'Definition')}:**")
                         st.markdown(definitions_for_term["EN"])
 
         if search_term_for_glossary_input and num_glossary_terms_displayed == 0:
-            st.info(_("no_term_found")) # Displayed if search yields no results
-    elif not GLOSSARY_TERMS: # Check if GLOSSARY_TERMS dictionary itself is empty
-        st.warning(_("glossary_empty_message")) # Message if no terms are defined at all
+            st.info(_("no_term_found")) 
+    elif not GLOSSARY_TERMS: 
+        st.warning(_("glossary_empty_message"))
 
 # --- Optional Modules Display (Always in Sidebar for toggling) ---
-# This section should be outside the main 'if app_mode_selected' block so sidebar items are always present.
 st.sidebar.markdown("---")
 st.sidebar.markdown(f"## {_('optional_modules_header')}")
-# Use a unique key for the checkbox here as well
 show_optional_modules_in_sidebar_toggle = st.sidebar.checkbox(
     _('show_optional_modules'), 
     key="sidebar_optional_modules_toggle_checkbox", 
-    value=False # Default to collapsed/hidden
+    value=False 
 )
 if show_optional_modules_in_sidebar_toggle :
-    with st.sidebar.expander(_('optional_modules_title'), expanded=True): # Expander within the sidebar
-        # Fallback to DEFAULT_LANG's list if current language doesn't have one (shouldn't happen with full translations)
+    with st.sidebar.expander(_('optional_modules_title'), expanded=True):
         optional_list_markdown_content = _('optional_modules_list', 
                                           default_text_override=config.TEXT_STRINGS[config.DEFAULT_LANG].get('optional_modules_list',""))
-        st.markdown(optional_list_markdown_content, unsafe_allow_html=True) # Allow markdown for lists
+        st.markdown(optional_list_markdown_content, unsafe_allow_html=True)
 
 # --- Footer / App Info (Always in Sidebar) ---
 st.sidebar.markdown("---")
-st.sidebar.caption(f"{_(config.APP_TITLE_KEY)} {config.APP_VERSION}") # Use app_title_key from config
-st.sidebar.caption(_("Built with Streamlit, Plotly, and Pandas.", "Constructido con Streamlit, Plotly y Pandas."))
-st.sidebar.caption(_("Data Last Updated: (N/A for sample data)", "Última Actualización de Datos: (N/A para datos de muestra)"))
+st.sidebar.caption(f"{_(config.APP_TITLE_KEY)} {config.APP_VERSION}")
+# The following captions don't seem to have keys in TEXT_STRINGS; they could be added for full localization
+# If kept as hardcoded, they won't translate.
+st.sidebar.caption("Built with Streamlit, Plotly, and Pandas.")
+st.sidebar.caption("Data Last Updated: (N/A for sample data)")
