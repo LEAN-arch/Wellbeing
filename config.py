@@ -1,31 +1,79 @@
 # config.py
-import plotly.express as px  # <--- CRUCIAL IMPORT ADDED HERE
 import pandas as pd
+import logging # Import the logging module
+
+# Attempt to import plotly.express, but make it non-fatal for config definition
+try:
+    import plotly.express as px
+    PLOTLY_AVAILABLE = True
+except ImportError:
+    px = None # Define px as None if plotly.express cannot be imported
+    PLOTLY_AVAILABLE = False
+    logging.warning("config.py: plotly.express could not be imported. Using hardcoded fallback color schemes.")
+
+logger = logging.getLogger(__name__) # Initialize logger for this module
 
 # --- GENERAL APPLICATION SETTINGS ---
-APP_VERSION = "v1.0.5 (ConfigPxImportFix)" # Incrementing version
+APP_VERSION = "v1.0.6 (RobustColorConfig)"
 APP_TITLE_KEY = "app_title"
 APP_ICON = "🦺"
 
 # --- FILTER DEFAULTS ---
+# ... (your existing filter defaults) ...
 DEFAULT_SITES = []
 DEFAULT_REGIONS = []
 DEFAULT_DEPARTMENTS = []
 DEFAULT_FUNCTIONAL_CATEGORIES = []
 DEFAULT_SHIFTS = []
 
+
 # --- VISUALIZATION & THEME ---
-# These now correctly use 'px' which is imported at the top of this file
-COLOR_SCHEME_CATEGORICAL = px.colors.qualitative.Plotly
-COLOR_SCHEME_CATEGORICAL_SET2 = px.colors.qualitative.Set2
-COLOR_SCHEME_CATEGORICAL_ACCENT = px.colors.qualitative.Accent # Line that previously caused the error
-COLOR_SCHEME_CATEGORICAL_DARK2 = px.colors.qualitative.Dark2
-COLOR_SCHEME_CATEGORICAL_QUALITATIVE = px.colors.qualitative.Pastel
-COLOR_SCHEME_PROFESSIONAL_LINES = [
+
+# Default hardcoded fallbacks - these are standard Plotly palettes
+# You can replace these with any list of hex color strings you prefer as fallbacks.
+FALLBACK_PLOTLY_DEFAULT = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+FALLBACK_SET2 = ['#66c2a5', '#fc8d62', '#8da0cb', '#e78ac3', '#a6d854', '#ffd92f', '#e5c494', '#b3b3b3']
+FALLBACK_ACCENT = ['#7fc97f', '#beaed4', '#fdc086', '#ffff99', '#386cb0', '#f0027f', '#bf5b17', '#666666']
+FALLBACK_DARK2 = ['#1b9e77', '#d95f02', '#7570b3', '#e7298a', '#66a61e', '#e6ab02', '#a6761d', '#666666']
+FALLBACK_PASTEL = ['#a6cee3', '#1f78b4', '#b2df8a', '#33a02c', '#fb9a99', '#e31a1c', '#fdbf6f', '#ff7f00', '#cab2d6', '#6a3d9a', '#ffff99', '#b15928']
+FALLBACK_VIRIDIS = ['#440154', '#472c7a', '#3b528b', '#2c728e', '#21918c', '#28ae80', '#5ec962', '#addc30', '#fde725'] # Sample from Viridis
+
+# Function to safely get color schemes
+def get_px_color_scheme(path_elements: list, fallback_scheme: list, scheme_name: str) -> list:
+    if PLOTLY_AVAILABLE and px:
+        current_level = px.colors
+        try:
+            for element in path_elements:
+                current_level = getattr(current_level, element)
+            # Ensure the result is a list (some px.colors return objects that are not directly lists)
+            if isinstance(current_level, list):
+                return current_level
+            elif hasattr(current_level, '__dict__') and 'colors' in current_level.__dict__: # Some are objects with a 'colors' attr
+                 return current_level.colors
+            elif callable(current_level): # Some might be functions returning list e.g. px.colors.sample_colorscale
+                return fallback_scheme # Can't universally call, so use fallback for now
+            else:
+                logger.warning(f"Plotly color scheme '{scheme_name}' at px.colors.{'.'.join(path_elements)} did not return a list. Using fallback.")
+                return fallback_scheme
+        except AttributeError:
+            logger.warning(f"Path px.colors.{'.'.join(path_elements)} for '{scheme_name}' not found in Plotly Express. Using hardcoded fallback.")
+            return fallback_scheme
+        except Exception as e:
+            logger.error(f"Unexpected error getting Plotly color scheme '{scheme_name}': {e}. Using hardcoded fallback.")
+            return fallback_scheme
+    return fallback_scheme
+
+COLOR_SCHEME_CATEGORICAL = get_px_color_scheme(["qualitative", "Plotly"], FALLBACK_PLOTLY_DEFAULT, "Plotly Default")
+COLOR_SCHEME_CATEGORICAL_SET2 = get_px_color_scheme(["qualitative", "Set2"], FALLBACK_SET2, "Set2")
+COLOR_SCHEME_CATEGORICAL_ACCENT = get_px_color_scheme(["qualitative", "Accent"], FALLBACK_ACCENT, "Accent")
+COLOR_SCHEME_CATEGORICAL_DARK2 = get_px_color_scheme(["qualitative", "Dark2"], FALLBACK_DARK2, "Dark2")
+COLOR_SCHEME_CATEGORICAL_QUALITATIVE = get_px_color_scheme(["qualitative", "Pastel"], FALLBACK_PASTEL, "Pastel") # Often used for 'Pastel'
+COLOR_SCHEME_PROFESSIONAL_LINES = [ # This one is already a fallback / custom definition
     "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
     "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"
 ]
-COLOR_SCHEME_SEQUENTIAL = px.colors.sequential.Viridis
+COLOR_SCHEME_SEQUENTIAL = get_px_color_scheme(["sequential", "Viridis"], FALLBACK_VIRIDIS, "Viridis")
+
 
 COLOR_STATUS_GOOD = "#2ECC71"
 COLOR_STATUS_WARNING = "#F1C40F"
@@ -37,6 +85,10 @@ COLOR_TARGET_LINE = "#2c3e50"
 # --- VISUALIZATION STYLING CONSTANTS ---
 FONT_FAMILY_DEFAULT = "Arial, sans-serif"
 FONT_SIZE_TITLE_DEFAULT = 16
+# ... (rest of your styling constants, KPI thresholds, COLUMN_MAP, PLACEHOLDER_TEXT, TEXT_STRINGS, File Paths - NO CHANGES NEEDED HERE for THIS error)
+# Ensure all these subsequent sections are complete and as they were in your last good version.
+# I will include them for completeness assuming they were correct before.
+
 FONT_SIZE_BODY_DEFAULT = 11
 FONT_SIZE_LEGEND = 10
 FONT_SIZE_HOVER_LABEL = 11
@@ -76,7 +128,7 @@ COLOR_GAUGE_NEEDLE_BORDER = "rgba(0,0,0,1)"
 COLOR_GAUGE_BACKGROUND = "rgba(255,255,255,0.0)"
 COLOR_GAUGE_BORDERCOLOR = "rgba(0,0,0,0.1)"
 
-COLOR_SCHEME_RADAR_DEFAULT = COLOR_SCHEME_PROFESSIONAL_LINES
+COLOR_SCHEME_RADAR_DEFAULT = COLOR_SCHEME_PROFESSIONAL_LINES # Example: Defaulting to our curated list
 RADAR_FILL_OPACITY = 0.15
 COLOR_RADAR_POLAR_BACKGROUND = 'rgba(255,255,255,0)'
 COLOR_RADAR_AXIS_LINE = 'rgba(0,0,0,0.3)'
@@ -225,7 +277,6 @@ TEXT_STRINGS = {
         "no_insights_generated_stress": "Stress indicators appear within acceptable ranges or data is insufficient for detailed trend analysis.",
         "no_data_for_engagement_insights": "Insufficient data to generate engagement insights.",
         "no_data_for_stress_insights": "Insufficient data to generate stress insights.",
-
 
         "no_data_available": "No data available for the selected filters in this module.",
         "no_data_for_selection": "No data for current selection.",
