@@ -1,9 +1,9 @@
 # config.py
-import plotly.express as px
+import plotly.express as px # <--- ENSURE THIS IMPORT IS PRESENT AT THE TOP
 import pandas as pd
 
 # --- GENERAL APPLICATION SETTINGS ---
-APP_VERSION = "v1.0.3 (RadarVizEnhance)"
+APP_VERSION = "v1.0.4 (PlotlyPathFix)" # Incrementing for this fix
 APP_TITLE_KEY = "app_title"
 APP_ICON = "🦺"
 
@@ -15,9 +15,10 @@ DEFAULT_FUNCTIONAL_CATEGORIES = []
 DEFAULT_SHIFTS = []
 
 # --- VISUALIZATION & THEME ---
+# These now correctly use 'px' which is imported at the top of this file
 COLOR_SCHEME_CATEGORICAL = px.colors.qualitative.Plotly
 COLOR_SCHEME_CATEGORICAL_SET2 = px.colors.qualitative.Set2
-COLOR_SCHEME_CATEGORICAL_ACCENT = px.colors.qualitative.Accent
+COLOR_SCHEME_CATEGORICAL_ACCENT = px.colors.qualitative.Accent # Line that caused the error
 COLOR_SCHEME_CATEGORICAL_DARK2 = px.colors.qualitative.Dark2
 COLOR_SCHEME_CATEGORICAL_QUALITATIVE = px.colors.qualitative.Pastel
 COLOR_SCHEME_PROFESSIONAL_LINES = [
