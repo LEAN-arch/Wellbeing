@@ -2,15 +2,15 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import visualizations as viz # Custom visualization functions
-import config                  # Main config (excluding glossary terms)
-import insights                # New module for generating insights
-from glossary_data import GLOSSARY_TERMS # Import glossary from its own file
-from typing import List, Dict, Optional, Any, Union, Callable # Added Callable
+import visualizations as viz
+import config
+import insights
+from glossary_data import GLOSSARY_TERMS
+from typing import List, Dict, Optional, Any, Union, Callable
 
-# --- Page Configuration (Applied once at the top) ---
+# --- Page Configuration ---
 initial_lang_code_for_config = st.session_state.get('selected_lang_code', config.DEFAULT_LANG)
-if initial_lang_code_for_config not in config.TEXT_STRINGS:
+if initial_lang_code_for_config not in config.TEXT_STRINGS: # Robust fallback
     initial_lang_code_for_config = config.DEFAULT_LANG
 
 st.set_page_config(
@@ -26,23 +26,33 @@ def display_language_selector_stub(st_session_state: Any, get_localized_text_fun
     if 'selected_lang_code' not in st_session_state:
         st_session_state.selected_lang_code = config.DEFAULT_LANG
 
+    # Ensure index is valid if session state somehow gets an invalid language
+    current_lang_idx = 0
+    if st_session_state.selected_lang_code in available_langs:
+        current_lang_idx = available_langs.index(st_session_state.selected_lang_code)
+    else:
+        st_session_state.selected_lang_code = config.DEFAULT_LANG # Reset to default
+
     def update_lang_callback():
         st_session_state.selected_lang_code = st_session_state._app_lang_selector_key_widget_stub
 
     selected_lang = st.sidebar.selectbox(
         label=f"{config.TEXT_STRINGS['EN'].get('language_selector', 'Language')} / {config.TEXT_STRINGS['ES'].get('language_selector', 'Idioma')}",
         options=available_langs,
-        index=available_langs.index(st_session_state.selected_lang_code),
+        index=current_lang_idx,
         format_func=lambda x: config.TEXT_STRINGS[x].get(f"language_name_full_{x.upper()}", x.upper()),
-        key="_app_lang_selector_key_widget_stub", # Ensure unique key
+        key="_app_lang_selector_key_widget_stub",
         on_change=update_lang_callback
     )
     return st_session_state.selected_lang_code
 
+# Call the language selector (stub or your actual implementation)
+# Pass a lambda for get_localized_text_func to avoid circular dependency if _ is defined later
 selected_lang_code = display_language_selector_stub(st.session_state, lambda k,d=None: config.TEXT_STRINGS[st.session_state.selected_lang_code].get(k,d or k) )
 current_lang_texts = config.TEXT_STRINGS.get(selected_lang_code, config.TEXT_STRINGS[config.DEFAULT_LANG])
 
 def _(text_key: str, default_text_override: Optional[str] = None) -> str:
+    """Shortcut for getting localized text. Falls back to the key or override."""
     return current_lang_texts.get(text_key, default_text_override if default_text_override is not None else text_key)
 
 # --- App Navigation (Stub assuming ui_components.py is not used) ---
@@ -53,7 +63,7 @@ def display_navigation_stub() -> str:
     selected_mode = st.sidebar.radio(
         label=_("navigation_label", "Navigation"),
         options=[dashboard_nav_label, glossary_nav_label],
-        key="app_navigation_mode_radio_stub" # Ensure unique key
+        key="app_navigation_mode_radio_stub"
     )
     st.sidebar.markdown("---")
     return selected_mode
@@ -61,7 +71,7 @@ app_mode_selected = display_navigation_stub()
 
 
 # --- DASHBOARD MODE ---
-if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized label
+if app_mode_selected == _("dashboard_nav_label", "Dashboard"):
     # --- Data Loading ---
     @st.cache_data
     def load_data_main(file_path_str: str, date_cols_actual_names: Optional[List[str]] = None):
@@ -70,18 +80,20 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
             for col in df.columns:
                 if df[col].dtype == 'object' and df[col].notna().any():
                     try: df[col] = df[col].astype(str).str.strip()
-                    except AttributeError: pass # Handles non-string objects
+                    except AttributeError: pass
             return df
         except FileNotFoundError:
-            st.error(_("error_loading_data").format(file_path_str) + f". " + _("check_file_path_instruction", "Please verify file path and presence."))
+            st.error(_("error_loading_data", "Error loading data from file: {}. Ensure file exists and is correctly formatted.").format(file_path_str) + f". " + \
+                     _("check_file_path_instruction", "Please check the file path."))
             return pd.DataFrame()
         except Exception as e:
-            st.error(_("error_loading_data").format(file_path_str) + f" - {_('exception_detail_prefix','Exception')}: {e}")
+            st.error(_("error_loading_data", "Error loading data from file: {}.").format(file_path_str) + \
+                     f" - {_('exception_detail_prefix','Exception')}: {e}")
             return pd.DataFrame()
 
     stability_date_cols_parse = [config.COLUMN_MAP.get("date")] if config.COLUMN_MAP.get("date") else None
     df_stability_raw = load_data_main(config.STABILITY_DATA_FILE, date_cols_actual_names=stability_date_cols_parse)
-    df_safety_raw = load_data_main(config.SAFETY_DATA_FILE, date_cols_actual_names=None) # Month is text
+    df_safety_raw = load_data_main(config.SAFETY_DATA_FILE, date_cols_actual_names=None)
     df_engagement_raw = load_data_main(config.ENGAGEMENT_DATA_FILE, date_cols_actual_names=None)
     stress_date_cols_parse = [config.COLUMN_MAP.get("date")] if config.COLUMN_MAP.get("date") else None
     df_stress_raw = load_data_main(config.STRESS_DATA_FILE, date_cols_actual_names=stress_date_cols_parse)
@@ -155,7 +167,7 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
     if not df_stability_filtered.empty:
         cols_metrics_stab = st.columns(4)
         rot_rate_actual_col = config.COLUMN_MAP.get("rotation_rate")
-        if rot_rate_actual_col and rot_rate_actual_col in df_stability_filtered.columns: # Check if key and col exist
+        if rot_rate_actual_col and rot_rate_actual_col in df_stability_filtered.columns:
              avg_rotation_current = df_stability_filtered[rot_rate_actual_col].mean()
         prev_avg_rotation_val = get_dummy_prev_val(avg_rotation_current, 0.05, True)
         with cols_metrics_stab[0]:
@@ -237,7 +249,7 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
                 summary_safety_df = df_safety_filtered.groupby(month_col_name_safety, as_index=False).agg(
                     Incidents_Sum_Agg=(incidents_col_name_safety, 'sum'),
                     Near_Misses_Sum_Agg=(near_misses_col_name_safety, 'sum')
-                ).reset_index() # Added reset_index here
+                ).reset_index()
                 try:
                     month_order_cat_list = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
                     summary_safety_df[month_col_name_safety] = pd.Categorical(summary_safety_df[month_col_name_safety].astype(str), categories=month_order_cat_list, ordered=True)
@@ -251,7 +263,8 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
                         x_axis_title_key="month_axis_label", y_axis_title_key="count_label",
                         barmode='stack', show_total_for_stacked=True, data_label_format_str=".0f"
                     ), use_container_width=True)
-                    if not summary_safety_df.empty: total_inc_current_period = summary_safety_df['Incidents_Sum_Agg'].sum()
+                    if not summary_safety_df.empty:
+                        total_inc_current_period = summary_safety_df['Incidents_Sum_Agg'].sum()
                 else: st.warning(_("no_data_incidents_near_misses"))
             else: st.warning(_("no_data_incidents_near_misses"))
         if days_no_acc_col_name_safety and days_no_acc_col_name_safety in df_safety_filtered.columns:
@@ -288,11 +301,12 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
         with cols_layout_engagement_main[0]:
             radar_data_points_engagement = []
             radar_targets_localized_eng_radar = {}
-            for conceptual_key_radar, actual_col_radar in config.COLUMN_MAP.get("engagement_radar_dims_cols", {}).items():
+            engagement_radar_dims_cols_map = config.COLUMN_MAP.get("engagement_radar_dims_cols", {})
+            engagement_radar_dims_labels_map = config.COLUMN_MAP.get("engagement_radar_dims_labels", {})
+            for conceptual_key_radar, actual_col_radar in engagement_radar_dims_cols_map.items():
                 if actual_col_radar and actual_col_radar in df_engagement_filtered.columns:
                     avg_score_radar = df_engagement_filtered[actual_col_radar].mean()
-                    label_map = config.COLUMN_MAP.get("engagement_radar_dims_labels", {})
-                    label_key_for_display_radar = label_map.get(conceptual_key_radar, actual_col_radar)
+                    label_key_for_display_radar = engagement_radar_dims_labels_map.get(conceptual_key_radar, actual_col_radar)
                     display_name_for_radar = _(label_key_for_display_radar, actual_col_radar.replace('_', ' ').title())
                     if pd.notna(avg_score_radar):
                         radar_data_points_engagement.append({"Dimension": display_name_for_radar, "Score": avg_score_radar})
@@ -303,7 +317,7 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
                     df_radar_viz_eng, "Dimension", "Score", "engagement_dimensions_radar_title", selected_lang_code,
                     range_max_override=config.ENGAGEMENT_RADAR_DIM_SCALE_MAX, target_values_map=radar_targets_localized_eng_radar
                 ), use_container_width=True)
-            elif any(config.COLUMN_MAP.get("engagement_radar_dims_cols", {}).get(k) in df_engagement_filtered.columns for k in config.COLUMN_MAP.get("engagement_radar_dims_cols", {})):
+            elif any(engagement_radar_dims_cols_map.get(k) and engagement_radar_dims_cols_map.get(k) in df_engagement_filtered.columns for k in engagement_radar_dims_cols_map):
                  st.warning(_("no_data_radar"))
             else: st.warning(_("no_data_radar_columns"))
         with cols_layout_engagement_main[1]:
@@ -411,52 +425,50 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
         "stress_level_survey": _("Stress Level", default_text_override="Stress Level"),
         "incidents": _("Incidents", default_text_override="Incidents")
     }
-    spatial_metric_options_keys = { # These should match conceptual keys in COLUMN_MAP
+    spatial_metric_options_keys = {
         "stress_level_survey": "stress_level_survey",
         "incidents": "incidents"
     }
+    default_selectbox_metric_display_key = list(spatial_metric_options_display.keys())[0]
+    if 'selected_spatial_display_metric' not in st.session_state:
+        st.session_state.selected_spatial_display_metric = default_selectbox_metric_display_key
+    if st.session_state.selected_spatial_display_metric not in spatial_metric_options_display:
+         st.session_state.selected_spatial_display_metric = default_selectbox_metric_display_key
 
-    # Make sure default for selectbox is valid, even if language just changed.
-    default_selectbox_metric = list(spatial_metric_options_keys.keys())[0] # Default to the first option
-    if 'selected_spatial_metric' not in st.session_state:
-        st.session_state.selected_spatial_metric = default_selectbox_metric
-    # If current session state value isn't in options (e.g., lang change cleared text or something), reset
-    if st.session_state.selected_spatial_metric not in spatial_metric_options_keys:
-         st.session_state.selected_spatial_metric = default_selectbox_metric
-
-    selected_display_metric_key_for_selectbox = st.selectbox(
+    selected_display_metric_from_selectbox = st.selectbox(
         _("Select Metric for Spatial Analysis", default_text_override="Select Metric for Spatial Analysis"),
         options=list(spatial_metric_options_display.keys()),
         format_func=lambda x: spatial_metric_options_display[x],
-        index=list(spatial_metric_options_display.keys()).index(st.session_state.selected_spatial_metric), # Ensure index is valid
-        key="spatial_metric_selector_app" # Unique key for this selectbox
+        index=list(spatial_metric_options_display.keys()).index(st.session_state.selected_spatial_display_metric),
+        key="spatial_metric_selector_app"
     )
-    st.session_state.selected_spatial_metric = selected_display_metric_key_for_selectbox # Update session state
+    st.session_state.selected_spatial_display_metric = selected_display_metric_from_selectbox
     
-    selected_metric_col_key = spatial_metric_options_keys[st.session_state.selected_spatial_metric]
+    selected_metric_col_key = spatial_metric_options_keys[st.session_state.selected_spatial_display_metric]
     metric_to_map_actual_col = config.COLUMN_MAP.get(selected_metric_col_key)
     
     df_for_spatial_analysis = pd.DataFrame()
-    colorbar_title_key_for_metric_map = "value_axis_label" # Default
+    colorbar_title_key_for_metric_map = "value_axis_label"
 
     if metric_to_map_actual_col:
         if selected_metric_col_key == "stress_level_survey":
             if not df_stress_filtered.empty and metric_to_map_actual_col in df_stress_filtered.columns:
-                df_for_spatial_analysis = df_stress_filtered
+                df_for_spatial_analysis = df_stress_filtered.copy()
                 colorbar_title_key_for_metric_map = "stress_level_label_short"
         elif selected_metric_col_key == "incidents":
             if not df_safety_filtered.empty and metric_to_map_actual_col in df_safety_filtered.columns:
-                df_for_spatial_analysis = df_safety_filtered
+                df_for_spatial_analysis = df_safety_filtered.copy()
                 colorbar_title_key_for_metric_map = "incident_count_label_short"
     
     if not df_for_spatial_analysis.empty and metric_to_map_actual_col and metric_to_map_actual_col in df_for_spatial_analysis.columns:
         x_coord_col_key = "location_x"; y_coord_col_key = "location_y"
         actual_x_coord_col = config.COLUMN_MAP.get(x_coord_col_key); actual_y_coord_col = config.COLUMN_MAP.get(y_coord_col_key)
-        spatial_df_prepared = df_for_spatial_analysis.copy()
         
+        spatial_df_prepared = df_for_spatial_analysis
+
         has_real_coords = (actual_x_coord_col and actual_x_coord_col in spatial_df_prepared.columns and
                            actual_y_coord_col and actual_y_coord_col in spatial_df_prepared.columns and
-                           spatial_df_prepared[[actual_x_coord_col, actual_y_coord_col]].dropna().shape[0] > 0) # Check for some non-NaN coords
+                           spatial_df_prepared[[actual_x_coord_col, actual_y_coord_col]].dropna().shape[0] > 0)
 
         x_col_for_map_final, y_col_for_map_final = None, None
 
@@ -468,16 +480,16 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
             x_col_for_map_final, y_col_for_map_final = "_sim_x", "_sim_y"
             np.random.seed(42)
             cat_col_for_sim = None
-            if config.COLUMN_MAP.get("site") in spatial_df_prepared.columns and spatial_df_prepared[config.COLUMN_MAP.get("site")].nunique() > 1:
+            if config.COLUMN_MAP.get("site") and config.COLUMN_MAP.get("site") in spatial_df_prepared.columns and spatial_df_prepared[config.COLUMN_MAP.get("site")].nunique() > 1:
                 cat_col_for_sim = config.COLUMN_MAP.get("site")
-            elif config.COLUMN_MAP.get("department") in spatial_df_prepared.columns and spatial_df_prepared[config.COLUMN_MAP.get("department")].nunique() > 1:
+            elif config.COLUMN_MAP.get("department") and config.COLUMN_MAP.get("department") in spatial_df_prepared.columns and spatial_df_prepared[config.COLUMN_MAP.get("department")].nunique() > 1:
                 cat_col_for_sim = config.COLUMN_MAP.get("department")
             
-            if cat_col_for_sim and cat_col_for_sim in spatial_df_prepared.columns:
+            if cat_col_for_sim :
                 unique_cats = spatial_df_prepared[cat_col_for_sim].dropna().unique()
                 if len(unique_cats) > 0:
                     cat_to_x = {cat: i * 100 + np.random.randint(-20, 20) for i, cat in enumerate(unique_cats)}
-                    cat_to_y = {cat: (i % 3) * 70 + np.random.randint(-15, 15) for i, cat in enumerate(unique_cats)}
+                    cat_to_y = {cat: (i % (len(unique_cats)//2 + 1)) * 70 + np.random.randint(-15, 15) for i, cat in enumerate(unique_cats)}
                     spatial_df_prepared[x_col_for_map_final] = spatial_df_prepared[cat_col_for_sim].map(cat_to_x).fillna(np.random.uniform(0,200)) + np.random.normal(0, 15, size=len(spatial_df_prepared))
                     spatial_df_prepared[y_col_for_map_final] = spatial_df_prepared[cat_col_for_sim].map(cat_to_y).fillna(np.random.uniform(0,100)) + np.random.normal(0, 15, size=len(spatial_df_prepared))
                 else:
@@ -502,30 +514,30 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
             st.subheader(_("Worker Density Heatmap", default_text_override="Worker Concentration"))
             density_map_fig = viz.create_worker_density_heatmap(
                 df_input=spatial_df_prepared, x_col=x_col_for_map_final, y_col=y_col_for_map_final,
-                title_key="", lang=selected_lang_code, # Title handled by st.subheader
+                title_key="", lang=selected_lang_code, # Title is st.subheader
                 facility_dimensions=facility_dimensions_map, entry_exit_points=entry_exit_points_to_plot )
             st.plotly_chart(density_map_fig, use_container_width=True)
             st.markdown("---")
 
             if metric_to_map_actual_col in spatial_df_prepared.columns and not spatial_df_prepared[metric_to_map_actual_col].dropna().empty:
-                metric_map_dynamic_title = f"{_('Metric Density', default_text_override='Metric Density')}: {spatial_metric_options_display[selected_display_metric]}"
+                metric_display_name_for_title = spatial_metric_options_display[st.session_state.selected_spatial_display_metric]
+                metric_map_dynamic_title = f"{_('Metric Density', default_text_override='Metric Density')}: {metric_display_name_for_title}"
                 st.subheader(metric_map_dynamic_title)
+                
                 metric_heatmap_fig = viz.create_metric_density_heatmap(
                     df_input=spatial_df_prepared, x_col=x_col_for_map_final, y_col=y_col_for_map_final, z_col=metric_to_map_actual_col,
-                    title_key="", lang=selected_lang_code, # Title handled by st.subheader
-                    aggregation_func="avg" if selected_spatial_metric_key == "stress_level_survey" else "sum",
-                    colorscale="Reds" if selected_spatial_metric_key == "stress_level_survey" else "YlOrRd", # More distinct for incidents
+                    title_key="", lang=selected_lang_code, # Title set by st.subheader
+                    aggregation_func="avg" if selected_metric_col_key == "stress_level_survey" else "sum",
+                    colorscale="Reds" if selected_metric_col_key == "stress_level_survey" else "YlOrRd",
                     colorbar_title_key=colorbar_title_key_for_metric_map,
                     show_points=config.HEATMAP_SHOW_POINTS_OVERLAY,
                     facility_dimensions=facility_dimensions_map, entry_exit_points=entry_exit_points_to_plot )
                 st.plotly_chart(metric_heatmap_fig, use_container_width=True)
-            else: st.warning(_("heatmap_no_value_data") + f" (Metric: {selected_spatial_metric_key})")
+            else: st.warning(_("heatmap_no_value_data") + f" ({_('metric_key', default_text_override='Metric')}: {selected_metric_col_key})") # Make new key
         else: st.warning(_("heatmap_no_coordinate_data"))
     else:
-        st.info(_("no_data_available") + f" {_('for_metric_key', 'for metric')}: {spatial_metric_options_display.get(selected_spatial_metric_key, selected_spatial_metric_key)}") # Make new key "for_metric_key"
-
+        st.info(_("no_data_available") + f" ({_('for_metric_key', default_text_override='for metric')}: {spatial_metric_options_display.get(st.session_state.selected_spatial_display_metric, st.session_state.selected_spatial_display_metric)})")
     st.markdown("---")
-
 
     # --- 6. Predictive AI Insights (Placeholder) ---
     st.header(_("ai_insights_title"))
@@ -534,47 +546,58 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
     st.warning(_("module_in_development_warning").format(module_name=module_name_ai) )
     st.markdown("---")
 
-
 # --- GLOSSARY PAGE ---
 elif app_mode_selected == _("glossary_nav_label", "Glossary"):
-    # ... (Glossary logic remains the same) ...
-    st.title(_("glossary_page_title")); st.markdown(_("glossary_intro")); st.markdown("---")
+    st.title(_("glossary_page_title"))
+    st.markdown(_("glossary_intro"))
+    st.markdown("---")
     search_term_for_glossary_input = st.text_input(_("search_term_label"), key="glossary_search_text_field")
-    sorted_glossary_data_from_file = dict(sorted(GLOSSARY_TERMS.items())); num_glossary_terms_displayed = 0
+    sorted_glossary_data_from_file = dict(sorted(GLOSSARY_TERMS.items()))
+    num_glossary_terms_displayed = 0
     if sorted_glossary_data_from_file:
         for term_key_english, definitions_for_term in sorted_glossary_data_from_file.items():
             display_this_term_in_glossary = True
             if search_term_for_glossary_input:
                 search_text_lower = search_term_for_glossary_input.lower()
                 match_in_english_key = search_text_lower in term_key_english.lower()
-                match_in_english_def = search_text_lower in definitions_for_term.get("EN", "").lower() if definitions_for_term.get("EN") else False
-                match_in_spanish_def = search_text_lower in definitions_for_term.get("ES", "").lower() if definitions_for_term.get("ES") else False
-                if not (match_in_english_key or match_in_english_def or match_in_spanish_def): display_this_term_in_glossary = False
+                match_in_english_def = definitions_for_term.get("EN", "").lower().find(search_text_lower) != -1
+                match_in_spanish_def = definitions_for_term.get("ES", "").lower().find(search_text_lower) != -1
+                if not (match_in_english_key or match_in_english_def or match_in_spanish_def):
+                    display_this_term_in_glossary = False
             if display_this_term_in_glossary:
                 num_glossary_terms_displayed +=1
                 with st.expander(term_key_english, expanded=(search_term_for_glossary_input != "")):
-                    primary_display_lang_key = selected_lang_code.upper(); secondary_display_lang_key = "ES" if primary_display_lang_key == "EN" else "EN"
+                    primary_display_lang_key = selected_lang_code.upper()
+                    secondary_display_lang_key = "ES" if primary_display_lang_key == "EN" else "EN"
                     if primary_display_lang_key in definitions_for_term and definitions_for_term[primary_display_lang_key]:
-                        st.markdown(f"**{_('definition_label')}:**"); st.markdown(definitions_for_term[primary_display_lang_key])
+                        st.markdown(f"**{_('definition_label')}:**")
+                        st.markdown(definitions_for_term[primary_display_lang_key])
                     if secondary_display_lang_key in definitions_for_term and definitions_for_term[secondary_display_lang_key]:
-                         if primary_display_lang_key in definitions_for_term and definitions_for_term[primary_display_lang_key]: st.markdown("---")
+                         if primary_display_lang_key in definitions_for_term and definitions_for_term[primary_display_lang_key]:
+                             st.markdown("---")
                          secondary_lang_full_name = _(f"language_name_full_{secondary_display_lang_key.upper()}", secondary_display_lang_key)
                          st.caption(f"*{secondary_lang_full_name}:* {definitions_for_term[secondary_display_lang_key]}")
                     elif "EN" in definitions_for_term and definitions_for_term["EN"] and primary_display_lang_key != "EN":
-                        st.markdown(f"**{config.TEXT_STRINGS['EN'].get('definition_label', 'Definition')}:**"); st.markdown(definitions_for_term["EN"])
-        if search_term_for_glossary_input and num_glossary_terms_displayed == 0: st.info(_("no_term_found"))
-    elif not GLOSSARY_TERMS: st.warning(_("glossary_empty_message"))
+                        st.markdown(f"**{config.TEXT_STRINGS['EN'].get('definition_label', 'Definition')}:**")
+                        st.markdown(definitions_for_term["EN"])
+        if search_term_for_glossary_input and num_glossary_terms_displayed == 0:
+            st.info(_("no_term_found"))
+    elif not GLOSSARY_TERMS:
+        st.warning(_("glossary_empty_message"))
 
 # --- Optional Modules & Footer Stubs ---
 def display_optional_modules_toggle_stub():
-    st.sidebar.markdown("---"); st.sidebar.markdown(f"## {_('optional_modules_header')}")
+    st.sidebar.markdown("---")
+    st.sidebar.markdown(f"## {_('optional_modules_header')}")
     show_optional = st.sidebar.checkbox( _('show_optional_modules'), key="sidebar_optional_modules_toggle_checkbox_stub", value=False )
     if show_optional :
         with st.sidebar.expander(_('optional_modules_title'), expanded=True):
             optional_list_markdown_content = _('optional_modules_list', default_text_override=config.TEXT_STRINGS[config.DEFAULT_LANG].get('optional_modules_list',""))
             st.markdown(optional_list_markdown_content, unsafe_allow_html=True)
+
 def display_footer_stub():
-    st.sidebar.markdown("---"); st.sidebar.caption(f"{_(config.APP_TITLE_KEY)} {config.APP_VERSION}")
+    st.sidebar.markdown("---")
+    st.sidebar.caption(f"{_(config.APP_TITLE_KEY)} {config.APP_VERSION}")
     st.sidebar.caption(_("Built with Streamlit, Plotly, and Pandas.", "Constructido con Streamlit, Plotly y Pandas."))
     st.sidebar.caption(_("Data Last Updated: (N/A for sample data)", "Última Actualización de Datos: (N/A para datos de muestra)"))
 
