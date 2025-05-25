@@ -9,56 +9,46 @@ from glossary_data import GLOSSARY_TERMS # Import glossary from its own file
 from typing import List, Dict, Optional, Any, Union, Callable # Added Callable
 
 
-# --- If ui_components.py does NOT exist, comment out this import: ---
+# --- (Import for ui_components.py remains commented out as per previous discussion) ---
 # from ui_components import (display_language_selector, display_navigation,
 #                            display_sidebar_filters, display_optional_modules_toggle,
 #                            display_footer)
-# ---
 
-
-# --- Page Configuration (Applied once at the top) ---
-# Determine initial language for page config before full session state might be active
+# --- Page Configuration ---
 initial_lang_code_for_config = st.session_state.get('selected_lang_code', config.DEFAULT_LANG)
-if initial_lang_code_for_config not in config.TEXT_STRINGS: # Fallback if lang somehow not in dict
+if initial_lang_code_for_config not in config.TEXT_STRINGS:
     initial_lang_code_for_config = config.DEFAULT_LANG
-
 st.set_page_config(
-    page_title=config.TEXT_STRINGS[initial_lang_code_for_config].get("app_title", "Vital Signs Dashboard"), # Fallback title
+    page_title=config.TEXT_STRINGS[initial_lang_code_for_config].get("app_title", "Vital Signs Dashboard"),
     page_icon=config.APP_ICON,
     layout="wide"
 )
 
-# --- Language Selection & Localization Helper ---
-# Placeholder for display_language_selector if ui_components.py is not used
+# --- Language Selection & Localization Helper (Stubs for now) ---
 def display_language_selector_stub(st_session_state: Any, get_localized_text_func: Callable[[str, Optional[str]], str]) -> str:
     st.sidebar.markdown("---")
     available_langs = list(config.TEXT_STRINGS.keys())
     if 'selected_lang_code' not in st_session_state:
         st_session_state.selected_lang_code = config.DEFAULT_LANG
-
     def update_lang_callback():
         st_session_state.selected_lang_code = st_session_state._app_lang_selector_key_widget_stub
-
     selected_lang = st.sidebar.selectbox(
         label=f"{config.TEXT_STRINGS['EN'].get('language_selector', 'Language')} / {config.TEXT_STRINGS['ES'].get('language_selector', 'Idioma')}",
         options=available_langs,
         index=available_langs.index(st_session_state.selected_lang_code),
         format_func=lambda x: config.TEXT_STRINGS[x].get(f"language_name_full_{x.upper()}", x.upper()),
-        key="_app_lang_selector_key_widget_stub", # Ensure unique key
+        key="_app_lang_selector_key_widget_stub",
         on_change=update_lang_callback
     )
     return st_session_state.selected_lang_code
 
-# Call the language selector (stub or your actual implementation)
 selected_lang_code = display_language_selector_stub(st.session_state, lambda k,d=None: config.TEXT_STRINGS[st.session_state.selected_lang_code].get(k,d or k) )
 current_lang_texts = config.TEXT_STRINGS.get(selected_lang_code, config.TEXT_STRINGS[config.DEFAULT_LANG])
 
 def _(text_key: str, default_text_override: Optional[str] = None) -> str:
-    """Shortcut for getting localized text. Falls back to the key or override."""
     return current_lang_texts.get(text_key, default_text_override if default_text_override is not None else text_key)
 
-# --- App Navigation (Main area control) ---
-# Placeholder for display_navigation if ui_components.py is not used
+# --- App Navigation (Stub for now) ---
 def display_navigation_stub() -> str:
     st.sidebar.markdown("---")
     dashboard_nav_label = _("dashboard_nav_label", "Dashboard")
@@ -66,16 +56,15 @@ def display_navigation_stub() -> str:
     selected_mode = st.sidebar.radio(
         label=_("navigation_label", "Navigation"),
         options=[dashboard_nav_label, glossary_nav_label],
-        key="app_navigation_mode_radio_stub" # Ensure unique key
+        key="app_navigation_mode_radio_stub"
     )
     st.sidebar.markdown("---")
     return selected_mode
-
 app_mode_selected = display_navigation_stub()
 
 
 # --- DASHBOARD MODE ---
-if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized label
+if app_mode_selected == _("dashboard_nav_label", "Dashboard"):
     # --- Data Loading ---
     @st.cache_data
     def load_data_main(file_path_str: str, date_cols_actual_names: Optional[List[str]] = None):
@@ -100,11 +89,9 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
     stress_date_cols_parse = [config.COLUMN_MAP.get("date")] if config.COLUMN_MAP.get("date") else None
     df_stress_raw = load_data_main(config.STRESS_DATA_FILE, date_cols_actual_names=stress_date_cols_parse)
 
-    # --- Sidebar Filters ---
-    # Placeholder for display_sidebar_filters if ui_components.py is not used
+    # --- Sidebar Filters (Stub for now) ---
     def display_sidebar_filters_stub(all_raw_dfs: List[pd.DataFrame]) -> Dict[str, List[str]]:
         st.sidebar.header(_("filters_header"))
-        
         def get_unique_opts(dfs_list: List[pd.DataFrame], col_key: str) -> List[str]:
             actual_col = config.COLUMN_MAP.get(col_key)
             if not actual_col: return []
@@ -113,27 +100,22 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
                 if not df_item.empty and actual_col in df_item.columns:
                     opts_set.update(df_item[actual_col].dropna().astype(str).tolist())
             return sorted(list(opts_set))
-
         sites_opts = get_unique_opts(all_raw_dfs, "site")
         regions_opts = get_unique_opts(all_raw_dfs, "region")
         depts_opts = get_unique_opts(all_raw_dfs, "department")
         fcs_opts = get_unique_opts(all_raw_dfs, "fc")
         shifts_opts = get_unique_opts(all_raw_dfs, "shift")
-
         sel_sites = st.sidebar.multiselect(_("select_site"), options=sites_opts, default=config.DEFAULT_SITES, key="stub_filter_sites")
         sel_regions = st.sidebar.multiselect(_("select_region"), options=regions_opts, default=config.DEFAULT_REGIONS, key="stub_filter_regions")
         sel_depts = st.sidebar.multiselect(_("select_department"), options=depts_opts, default=config.DEFAULT_DEPARTMENTS, key="stub_filter_depts")
         sel_fcs = st.sidebar.multiselect(_("select_fc"), options=fcs_opts, default=config.DEFAULT_FUNCTIONAL_CATEGORIES, key="stub_filter_fcs")
         sel_shifts = st.sidebar.multiselect(_("select_shift"), options=shifts_opts, default=config.DEFAULT_SHIFTS, key="stub_filter_shifts")
-        
         return {'site': sel_sites, 'region': sel_regions, 'department': sel_depts, 'fc': sel_fcs, 'shift': sel_shifts}
 
     all_dataframes_list = [df for df in [df_stability_raw, df_safety_raw, df_engagement_raw, df_stress_raw] if not df.empty]
     filter_selections_active_map = display_sidebar_filters_stub(all_dataframes_list)
 
-
-    def apply_all_filters_to_df(df_to_filter: pd.DataFrame, col_map: Dict[str, str],
-                              selections: Dict[str, List[str]]) -> pd.DataFrame:
+    def apply_all_filters_to_df(df_to_filter: pd.DataFrame, col_map: Dict[str, str], selections: Dict[str, List[str]]) -> pd.DataFrame:
         if df_to_filter.empty: return df_to_filter.copy()
         df_filtered = df_to_filter.copy()
         for concept_key, selected_opts_list in selections.items():
@@ -155,7 +137,8 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
     st.info(_("psych_safety_note"))
     st.markdown("---")
 
-    def get_dummy_prev_val(curr_val: Optional[Union[int, float, np.number]],
+    def get_dummy_prev_val(#... unchanged ...
+                           curr_val: Optional[Union[int, float, np.number]],
                            factor: float = 0.1, is_percent: bool = False,
                            variation_abs: Optional[Union[int, float]] = None) -> Optional[float]:
         if pd.isna(curr_val) or not isinstance(curr_val, (int,float,np.number)): return None
@@ -170,17 +153,17 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
         return round(previous_val_calculated, 1) if not pd.isna(previous_val_calculated) else None
 
     # --- 1. Laboral Stability Panel ---
+    # ... (Unchanged from your last correct version) ...
     st.header(_("stability_panel_title"))
     agg_trend_stability = pd.DataFrame()
     avg_rotation_current = float('nan')
-
     if not df_stability_filtered.empty:
+        # ... (stability panel content as before) ...
         cols_metrics_stab = st.columns(4)
         rot_rate_actual_col = config.COLUMN_MAP.get("rotation_rate", "rotation_rate")
         if rot_rate_actual_col in df_stability_filtered.columns:
              avg_rotation_current = df_stability_filtered[rot_rate_actual_col].mean()
         prev_avg_rotation_val = get_dummy_prev_val(avg_rotation_current, 0.05, True)
-
         with cols_metrics_stab[0]:
             viz.display_metric_card(st, "rotation_rate_gauge", avg_rotation_current, selected_lang_code, unit="%",
                                     higher_is_better=False, target_value=config.STABILITY_ROTATION_RATE["target"],
@@ -193,7 +176,6 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
                     threshold_good=config.STABILITY_ROTATION_RATE["good"], threshold_warning=config.STABILITY_ROTATION_RATE["warning"],
                     target_line_value=config.STABILITY_ROTATION_RATE["target"], previous_value=prev_avg_rotation_val
                 ), use_container_width=True)
-
         retention_metric_definitions = [
             ("retention_6m", "retention_6m_metric"),
             ("retention_12m", "retention_12m_metric"),
@@ -213,18 +195,15 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
                                         previous_value=previous_value_retention,
                                         help_text_key="retention_metric_help")
         st.markdown("<br>", unsafe_allow_html=True)
-
         date_actual_col_stability = config.COLUMN_MAP.get("date", "date")
         hires_actual_col_stability = config.COLUMN_MAP.get("hires", "hires")
         exits_actual_col_stability = config.COLUMN_MAP.get("exits", "exits")
-
         if all(col_name in df_stability_filtered.columns for col_name in [date_actual_col_stability, hires_actual_col_stability, exits_actual_col_stability]):
             trend_df_for_stability = df_stability_filtered[[date_actual_col_stability, hires_actual_col_stability, exits_actual_col_stability]].copy()
             if not pd.api.types.is_datetime64_any_dtype(trend_df_for_stability[date_actual_col_stability]):
                 trend_df_for_stability[date_actual_col_stability] = pd.to_datetime(trend_df_for_stability[date_actual_col_stability], errors='coerce')
             trend_df_for_stability.dropna(subset=[date_actual_col_stability], inplace=True)
             trend_df_for_stability.sort_values(by=date_actual_col_stability, inplace=True)
-
             if not trend_df_for_stability.empty:
                 agg_trend_stability = trend_df_for_stability.groupby(pd.Grouper(key=date_actual_col_stability, freq='M')).agg(
                     Hires_Total_Agg=(hires_actual_col_stability, 'sum'),
@@ -240,7 +219,6 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
                 ), use_container_width=True)
             else: st.warning(_("no_data_hires_exits"))
         else: st.warning(_("no_data_hires_exits"))
-
         action_insights_stability = insights.generate_stability_insights(
             df_stability_filtered, avg_rotation_current,
             agg_trend_stability if not agg_trend_stability.empty else pd.DataFrame(),
@@ -256,18 +234,18 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
 
 
     # --- 2. Safety Pulse Module ---
+    # ... (Unchanged from your last correct version) ...
     st.header(_("safety_pulse_title"))
     total_inc_current_period = float('nan')
     current_dwa_val = float('nan')
-
     if not df_safety_filtered.empty:
+        # ... (safety panel content as before) ...
         cols_layout_safety_main = st.columns([2, 1, 1])
         month_col_name_safety = config.COLUMN_MAP.get("month", "month")
         incidents_col_name_safety = config.COLUMN_MAP.get("incidents", "incidents")
         near_misses_col_name_safety = config.COLUMN_MAP.get("near_misses", "near_misses")
         days_no_acc_col_name_safety = config.COLUMN_MAP.get("days_without_accidents", "days_without_accidents")
         active_alerts_col_name_safety = config.COLUMN_MAP.get("active_alerts", "active_alerts")
-
         with cols_layout_safety_main[0]:
             if all(c in df_safety_filtered.columns for c in [month_col_name_safety, incidents_col_name_safety, near_misses_col_name_safety]):
                 summary_safety_df = df_safety_filtered.groupby(month_col_name_safety, as_index=False).agg(
@@ -291,7 +269,6 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
                         total_inc_current_period = summary_safety_df['Incidents_Sum_Agg'].sum()
                 else: st.warning(_("no_data_incidents_near_misses"))
             else: st.warning(_("no_data_incidents_near_misses"))
-
         if days_no_acc_col_name_safety in df_safety_filtered.columns:
             current_dwa_val = df_safety_filtered[days_no_acc_col_name_safety].max()
         with cols_layout_safety_main[1]:
@@ -311,7 +288,6 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
                                    higher_is_better=False, target_value=0,
                                    threshold_good=0, threshold_warning=1,
                                    previous_value=previous_active_alerts_val)
-
         action_insights_safety_list = insights.generate_safety_insights(df_safety_filtered, current_dwa_val, total_inc_current_period, selected_lang_code)
         if action_insights_safety_list:
             st.markdown("---")
@@ -320,12 +296,12 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
     else: st.info(_("no_data_available"))
     st.markdown("---")
 
-
     # --- 3. Employee Engagement & Commitment ---
+    # ... (Unchanged from your last correct version) ...
     st.header(_("engagement_title"))
     avg_enps_for_insight, avg_climate_for_insight, participation_for_insight = float('nan'), float('nan'), float('nan')
-
     if not df_engagement_filtered.empty:
+        # ... (engagement panel content as before) ...
         cols_layout_engagement_main = st.columns([2,1])
         with cols_layout_engagement_main[0]:
             radar_data_points_engagement = []
@@ -343,12 +319,11 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
                 st.plotly_chart(viz.create_enhanced_radar_chart(
                     df_radar_viz_eng, "Dimension", "Score", "engagement_dimensions_radar_title", selected_lang_code,
                     range_max_override=config.ENGAGEMENT_RADAR_DIM_SCALE_MAX,
-                    target_values_map=radar_targets_localized_eng_radar # Removed fill_opacity, will use default from viz
+                    target_values_map=radar_targets_localized_eng_radar
                 ), use_container_width=True)
             elif any(config.COLUMN_MAP["engagement_radar_dims_cols"].get(k) in df_engagement_filtered.columns for k in config.COLUMN_MAP["engagement_radar_dims_cols"]):
                  st.warning(_("no_data_radar"))
             else: st.warning(_("no_data_radar_columns"))
-
         with cols_layout_engagement_main[1]:
             kpis_engagement_config_list = [
                 ("labor_climate_score", "labor_climate_score_metric", "", True, config.ENGAGEMENT_CLIMATE_SCORE, None),
@@ -376,7 +351,6 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
                 if col_map_k_eng_card == "enps_score": avg_enps_for_insight = current_val_metric_eng_card
                 if col_map_k_eng_card == "labor_climate_score": avg_climate_for_insight = current_val_metric_eng_card
                 if col_map_k_eng_card == "participation_rate": participation_for_insight = current_val_metric_eng_card
-
         action_insights_engagement_list = insights.generate_engagement_insights(avg_enps_for_insight, avg_climate_for_insight, participation_for_insight, selected_lang_code)
         if action_insights_engagement_list:
             st.markdown("---")
@@ -386,11 +360,12 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
     st.markdown("---")
 
     # --- 4. Operational Stress Dashboard ---
+    # ... (Unchanged from your last correct version) ...
     st.header(_("stress_title"))
     avg_stress_current_val_for_insight = float('nan')
     df_stress_trends_for_insight_func = pd.DataFrame()
-
     if not df_stress_filtered.empty:
+        # ... (stress panel content as before) ...
         cols_layout_stress_page = st.columns([1, 2])
         stress_lvl_actual_col_stress = config.COLUMN_MAP.get("stress_level_survey")
         overtime_actual_col_stress = config.COLUMN_MAP.get("overtime_hours")
@@ -398,10 +373,8 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
         date_actual_col_stress_main = config.COLUMN_MAP.get("date")
         workload_actual_col_stress = config.COLUMN_MAP.get("workload_perception")
         psych_actual_col_stress = config.COLUMN_MAP.get("psychological_signals")
-
         if stress_lvl_actual_col_stress in df_stress_filtered.columns:
             avg_stress_current_val_for_insight = df_stress_filtered[stress_lvl_actual_col_stress].mean()
-
         with cols_layout_stress_page[0]:
             st.subheader(_("overall_stress_indicator_title"))
             st.plotly_chart(viz.create_stress_semaforo_visual(
@@ -410,7 +383,6 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
             target_stress_indicator_help = config.STRESS_LEVEL_PSYCHOSOCIAL['low']
             help_text_stress_caption = _("stress_indicator_help").format(target=f"{target_stress_indicator_help:.1f}") if "{target}" in _("stress_indicator_help") else _("stress_indicator_help")
             st.caption(help_text_stress_caption)
-
         with cols_layout_stress_page[1]:
             if all(c in df_stress_filtered.columns for c in [date_actual_col_stress_main, overtime_actual_col_stress, unfilled_actual_col_stress]):
                 df_shiftload_trend_stress = df_stress_filtered[[date_actual_col_stress_main, overtime_actual_col_stress, unfilled_actual_col_stress]].copy()
@@ -430,7 +402,6 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
                 else: st.warning(_("no_data_shift_load"))
             else: st.warning(_("no_data_shift_load"))
         st.markdown("---")
-
         if all(c in df_stress_filtered.columns for c in [date_actual_col_stress_main, workload_actual_col_stress, psych_actual_col_stress]):
             df_wp_ps_trend_stress_chart = df_stress_filtered[[date_actual_col_stress_main, workload_actual_col_stress, psych_actual_col_stress]].copy()
             if not pd.api.types.is_datetime64_any_dtype(df_wp_ps_trend_stress_chart[date_actual_col_stress_main]):
@@ -452,7 +423,6 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
                 ), use_container_width=True)
             else: st.warning(_("no_data_workload_psych"))
         else: st.warning(_("no_data_workload_psych"))
-
         action_insights_stress_list = insights.generate_stress_insights(avg_stress_current_val_for_insight, df_stress_trends_for_insight_func, selected_lang_code)
         if action_insights_stress_list:
             st.markdown("---")
@@ -461,18 +431,101 @@ if app_mode_selected == _("dashboard_nav_label", "Dashboard"): # Use localized l
     else: st.info(_("no_data_available"))
     st.markdown("---")
 
-    st.header(_("plant_map_title"))
-    st.markdown(config.PLACEHOLDER_TEXT_PLANT_MAP, unsafe_allow_html=True)
-    st.warning(_("This module is a placeholder for future development.", default_text_override="Module currently in development."))
+
+    # --- 5. Interactive Facility Overview (NOW FUNCTIONAL WITH SIMULATED HEATMAP) ---
+    st.header(_("facility_heatmap_title")) # Using new, more specific title from config
+
+    if not df_stress_filtered.empty:
+        actual_stress_col = config.COLUMN_MAP.get("stress_level_survey", "stress_level_survey")
+        actual_site_col = config.COLUMN_MAP.get("site") # For simulation if no coords
+        actual_dept_col = config.COLUMN_MAP.get("department") # For simulation
+
+        # Check if required stress column for Z-value exists
+        if actual_stress_col in df_stress_filtered.columns:
+            # Prepare a DataFrame specifically for the heatmap
+            heatmap_data_df = df_stress_filtered[[actual_stress_col]].copy()
+            heatmap_data_df.dropna(subset=[actual_stress_col], inplace=True) # Drop rows where Z value is NaN
+
+            # --- Coordinate Handling/Simulation ---
+            x_coord_col_name = config.COLUMN_MAP.get("location_x")
+            y_coord_col_name = config.COLUMN_MAP.get("location_y")
+
+            # Check if actual coordinate columns exist and have data
+            has_real_coords = (x_coord_col_name and x_coord_col_name in df_stress_filtered.columns and
+                               y_coord_col_name and y_coord_col_name in df_stress_filtered.columns and
+                               df_stress_filtered[[x_coord_col_name, y_coord_col_name]].notna().all(axis=1).any())
+
+            if has_real_coords:
+                heatmap_data_df[x_coord_col_name] = df_stress_filtered[x_coord_col_name]
+                heatmap_data_df[y_coord_col_name] = df_stress_filtered[y_coord_col_name]
+                x_col_for_heatmap = x_coord_col_name
+                y_col_for_heatmap = y_coord_col_name
+                heatmap_data_df.dropna(subset=[x_col_for_heatmap, y_col_for_heatmap], inplace=True) # Ensure coords are not NaN
+            else:
+                # Simulate coordinates if real ones are not available/sufficient
+                st.caption(_("Simulating facility coordinates for demonstration purposes.", 
+                             "Simulando coordenadas de instalación para demostración."))
+                x_col_for_heatmap = "_sim_x"
+                y_col_for_heatmap = "_sim_y"
+                
+                np.random.seed(42) # For reproducible simulation
+                if actual_site_col and actual_site_col in df_stress_filtered.columns and df_stress_filtered[actual_site_col].nunique() > 1:
+                    # Simulate based on 'site' if available and multiple sites exist
+                    unique_sites = df_stress_filtered[actual_site_col].unique()
+                    site_to_coord = {site: (i*50 + np.random.uniform(-10,10), np.random.uniform(0,50) + (i%2 * 30) ) for i, site in enumerate(unique_sites)}
+                    heatmap_data_df[x_col_for_heatmap] = df_stress_filtered[actual_site_col].map(lambda s: site_to_coord.get(s, (0,0))[0] + np.random.randn()*5)
+                    heatmap_data_df[y_col_for_heatmap] = df_stress_filtered[actual_site_col].map(lambda s: site_to_coord.get(s, (0,0))[1] + np.random.randn()*5)
+                elif actual_dept_col and actual_dept_col in df_stress_filtered.columns and df_stress_filtered[actual_dept_col].nunique() > 1:
+                    # Simulate based on 'department' if 'site' is not suitable
+                    unique_depts = df_stress_filtered[actual_dept_col].unique()
+                    dept_to_coord = {dept: (i*30 + np.random.uniform(-5,5), np.random.uniform(0,40) + (i%3 * 20) ) for i, dept in enumerate(unique_depts)}
+                    heatmap_data_df[x_col_for_heatmap] = df_stress_filtered[actual_dept_col].map(lambda d: dept_to_coord.get(d, (0,0))[0] + np.random.randn()*3)
+                    heatmap_data_df[y_col_for_heatmap] = df_stress_filtered[actual_dept_col].map(lambda d: dept_to_coord.get(d, (0,0))[1] + np.random.randn()*3)
+                else:
+                    # Purely random simulation if no suitable category for pseudo-layout
+                    heatmap_data_df[x_col_for_heatmap] = np.random.rand(len(heatmap_data_df)) * 100
+                    heatmap_data_df[y_col_for_heatmap] = np.random.rand(len(heatmap_data_df)) * 50
+            
+            # Create and display the heatmap
+            if not heatmap_data_df.empty and \
+               x_col_for_heatmap in heatmap_data_df.columns and \
+               y_col_for_heatmap in heatmap_data_df.columns and \
+               actual_stress_col in heatmap_data_df.columns:
+                
+                st.plotly_chart(viz.create_facility_heatmap(
+                    heatmap_data_df,
+                    x_col=x_col_for_heatmap,
+                    y_col=y_col_for_heatmap,
+                    z_col=actual_stress_col,
+                    title_key="facility_heatmap_title", # Using the new specific key
+                    lang=selected_lang_code,
+                    xbins=15, # Adjust binning for better visual representation
+                    ybins=10,
+                    aggregation_func="avg",
+                    colorscale="Reds", # Good for "hotness" / stress
+                    show_points=False # Optionally set to True to see raw points
+                ), use_container_width=True)
+            else:
+                st.warning(_("heatmap_no_coordinate_data"))
+        else:
+            st.warning(_("heatmap_no_value_data"))
+    else:
+        st.info(_("no_data_available")) # No stress data to derive map from
     st.markdown("---")
 
+    # --- 6. Predictive AI Insights (Placeholder) ---
     st.header(_("ai_insights_title"))
     st.markdown(config.PLACEHOLDER_TEXT_AI_INSIGHTS, unsafe_allow_html=True)
-    st.warning(_("This module is a placeholder for future development.", default_text_override="Module currently in development."))
+    module_name_ai = _("ai_insights_title").split(". ",1)[-1] if ". " in _("ai_insights_title") else _("ai_insights_title")
+    st.warning(
+        _("module_in_development_warning").format(module_name=module_name_ai)
+    )
     st.markdown("---")
 
+
 # --- GLOSSARY PAGE ---
-elif app_mode_selected == _("glossary_nav_label", "Glossary"): # Use localized label
+elif app_mode_selected == _("glossary_nav_label", "Glossary"):
+    # ... (Unchanged from your last correct version) ...
     st.title(_("glossary_page_title"))
     st.markdown(_("glossary_intro"))
     st.markdown("---")
@@ -510,14 +563,14 @@ elif app_mode_selected == _("glossary_nav_label", "Glossary"): # Use localized l
     elif not GLOSSARY_TERMS:
         st.warning(_("glossary_empty_message"))
 
-# --- Optional Modules & Footer (Always in Sidebar) ---
-# Placeholder for display_optional_modules_toggle if ui_components.py is not used
+# --- Optional Modules & Footer (Stubs for now) ---
 def display_optional_modules_toggle_stub():
+    # ... (Unchanged from your last correct version) ...
     st.sidebar.markdown("---")
     st.sidebar.markdown(f"## {_('optional_modules_header')}")
     show_optional = st.sidebar.checkbox(
         _('show_optional_modules'),
-        key="sidebar_optional_modules_toggle_checkbox_stub", # Ensure unique key
+        key="sidebar_optional_modules_toggle_checkbox_stub",
         value=False
     )
     if show_optional :
@@ -526,12 +579,12 @@ def display_optional_modules_toggle_stub():
                                               default_text_override=config.TEXT_STRINGS[config.DEFAULT_LANG].get('optional_modules_list',""))
             st.markdown(optional_list_markdown_content, unsafe_allow_html=True)
 
-# Placeholder for display_footer if ui_components.py is not used
 def display_footer_stub():
+    # ... (Unchanged from your last correct version) ...
     st.sidebar.markdown("---")
     st.sidebar.caption(f"{_(config.APP_TITLE_KEY)} {config.APP_VERSION}")
-    st.sidebar.caption(_("Built with Streamlit, Plotly, and Pandas.", "Constructido con Streamlit, Plotly y Pandas.")) # Adding bilingual default
-    st.sidebar.caption(_("Data Last Updated: (N/A for sample data)", "Última Actualización de Datos: (N/A para datos de muestra)")) # Adding bilingual default
+    st.sidebar.caption(_("Built with Streamlit, Plotly, and Pandas.", "Constructido con Streamlit, Plotly y Pandas."))
+    st.sidebar.caption(_("Data Last Updated: (N/A for sample data)", "Última Actualización de Datos: (N/A para datos de muestra)"))
 
 display_optional_modules_toggle_stub()
 display_footer_stub()
