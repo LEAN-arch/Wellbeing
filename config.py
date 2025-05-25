@@ -1,25 +1,31 @@
 # config.py
+import plotly.express as px
 import pandas as pd
-import logging # Import the logging module
+import logging
+
+# Initialize logger for this module
+logger = logging.getLogger(__name__)
 
 # Attempt to import plotly.express, but make it non-fatal for config definition
+# This block is more for if px might be optionally used or for extreme robustness.
+# Given the direct use below, if plotly.express is not installed,
+# the AttributeError will occur anyway, which is an acceptable failure for a missing dependency.
 try:
     import plotly.express as px
     PLOTLY_AVAILABLE = True
 except ImportError:
     px = None # Define px as None if plotly.express cannot be imported
     PLOTLY_AVAILABLE = False
-    logging.warning("config.py: plotly.express could not be imported. Using hardcoded fallback color schemes.")
+    # Use logger instead of print for warnings/errors if this module might be imported in non-interactive contexts
+    logger.warning("config.py: plotly.express could not be imported. Color schemes relying on 'px' will use hardcoded fallbacks.")
 
-logger = logging.getLogger(__name__) # Initialize logger for this module
 
 # --- GENERAL APPLICATION SETTINGS ---
-APP_VERSION = "v1.0.6 (RobustColorConfig)"
+APP_VERSION = "v1.0.6 (CompleteConfigFix)"
 APP_TITLE_KEY = "app_title"
 APP_ICON = "🦺"
 
 # --- FILTER DEFAULTS ---
-# ... (your existing filter defaults) ...
 DEFAULT_SITES = []
 DEFAULT_REGIONS = []
 DEFAULT_DEPARTMENTS = []
@@ -30,30 +36,30 @@ DEFAULT_SHIFTS = []
 # --- VISUALIZATION & THEME ---
 
 # Default hardcoded fallbacks - these are standard Plotly palettes
-# You can replace these with any list of hex color strings you prefer as fallbacks.
 FALLBACK_PLOTLY_DEFAULT = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
 FALLBACK_SET2 = ['#66c2a5', '#fc8d62', '#8da0cb', '#e78ac3', '#a6d854', '#ffd92f', '#e5c494', '#b3b3b3']
 FALLBACK_ACCENT = ['#7fc97f', '#beaed4', '#fdc086', '#ffff99', '#386cb0', '#f0027f', '#bf5b17', '#666666']
 FALLBACK_DARK2 = ['#1b9e77', '#d95f02', '#7570b3', '#e7298a', '#66a61e', '#e6ab02', '#a6761d', '#666666']
 FALLBACK_PASTEL = ['#a6cee3', '#1f78b4', '#b2df8a', '#33a02c', '#fb9a99', '#e31a1c', '#fdbf6f', '#ff7f00', '#cab2d6', '#6a3d9a', '#ffff99', '#b15928']
-FALLBACK_VIRIDIS = ['#440154', '#472c7a', '#3b528b', '#2c728e', '#21918c', '#28ae80', '#5ec962', '#addc30', '#fde725'] # Sample from Viridis
+FALLBACK_VIRIDIS = ['#440154', '#472c7a', '#3b528b', '#2c728e', '#21918c', '#28ae80', '#5ec962', '#addc30', '#fde725']
 
 # Function to safely get color schemes
 def get_px_color_scheme(path_elements: list, fallback_scheme: list, scheme_name: str) -> list:
-    if PLOTLY_AVAILABLE and px:
+    if PLOTLY_AVAILABLE and px: # Check if px was successfully imported
         current_level = px.colors
         try:
             for element in path_elements:
                 current_level = getattr(current_level, element)
-            # Ensure the result is a list (some px.colors return objects that are not directly lists)
             if isinstance(current_level, list):
                 return current_level
-            elif hasattr(current_level, '__dict__') and 'colors' in current_level.__dict__: # Some are objects with a 'colors' attr
-                 return current_level.colors
-            elif callable(current_level): # Some might be functions returning list e.g. px.colors.sample_colorscale
-                return fallback_scheme # Can't universally call, so use fallback for now
+            elif hasattr(current_level, '_deprecated_ môžete_použiť_implicitné_konverzie_') and hasattr(current_level, 'to_list'): # Adapt for some Plotly color objects
+                return current_level.to_list()
+            elif callable(current_level):
+                 # For cases like px.colors.sample_colorscale, which needs arguments
+                 logger.warning(f"Plotly color scheme '{scheme_name}' is a function and cannot be called without args here. Using fallback.")
+                 return fallback_scheme
             else:
-                logger.warning(f"Plotly color scheme '{scheme_name}' at px.colors.{'.'.join(path_elements)} did not return a list. Using fallback.")
+                logger.warning(f"Plotly color scheme '{scheme_name}' at px.colors.{'.'.join(path_elements)} did not return a list. Type was {type(current_level)}. Using fallback.")
                 return fallback_scheme
         except AttributeError:
             logger.warning(f"Path px.colors.{'.'.join(path_elements)} for '{scheme_name}' not found in Plotly Express. Using hardcoded fallback.")
@@ -61,36 +67,41 @@ def get_px_color_scheme(path_elements: list, fallback_scheme: list, scheme_name:
         except Exception as e:
             logger.error(f"Unexpected error getting Plotly color scheme '{scheme_name}': {e}. Using hardcoded fallback.")
             return fallback_scheme
-    return fallback_scheme
+    else: # px is None because plotly.express was not imported
+        logger.info(f"Plotly Express (px) not available. Using hardcoded fallback for scheme '{scheme_name}'.")
+        return fallback_scheme
 
 COLOR_SCHEME_CATEGORICAL = get_px_color_scheme(["qualitative", "Plotly"], FALLBACK_PLOTLY_DEFAULT, "Plotly Default")
 COLOR_SCHEME_CATEGORICAL_SET2 = get_px_color_scheme(["qualitative", "Set2"], FALLBACK_SET2, "Set2")
 COLOR_SCHEME_CATEGORICAL_ACCENT = get_px_color_scheme(["qualitative", "Accent"], FALLBACK_ACCENT, "Accent")
 COLOR_SCHEME_CATEGORICAL_DARK2 = get_px_color_scheme(["qualitative", "Dark2"], FALLBACK_DARK2, "Dark2")
-COLOR_SCHEME_CATEGORICAL_QUALITATIVE = get_px_color_scheme(["qualitative", "Pastel"], FALLBACK_PASTEL, "Pastel") # Often used for 'Pastel'
-COLOR_SCHEME_PROFESSIONAL_LINES = [ # This one is already a fallback / custom definition
+COLOR_SCHEME_CATEGORICAL_QUALITATIVE = get_px_color_scheme(["qualitative", "Pastel"], FALLBACK_PASTEL, "Pastel")
+COLOR_SCHEME_PROFESSIONAL_LINES = [
     "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
     "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"
 ]
 COLOR_SCHEME_SEQUENTIAL = get_px_color_scheme(["sequential", "Viridis"], FALLBACK_VIRIDIS, "Viridis")
 
+COLOR_SCHEME_RADAR_OPTIMAL = [ # SME Curated Palette
+    '#4477AA', '#EE6677', '#228833', '#CCBB44', '#66CCEE', '#AA3377', '#BBBBBB',
+    '#0077BB', '#EE7733', '#009988', '#EE3377', '#33BBEE'
+]
+COLOR_RADAR_PRIMARY_TRACE = '#000000'
+COLOR_RADAR_TARGET_LINE = '#888888'
 
 COLOR_STATUS_GOOD = "#2ECC71"
 COLOR_STATUS_WARNING = "#F1C40F"
 COLOR_STATUS_CRITICAL = "#E74C3C"
 COLOR_NEUTRAL_INFO = "#3498DB"
 COLOR_TEXT_SECONDARY = "#566573"
-COLOR_TARGET_LINE = "#2c3e50"
+COLOR_TARGET_LINE = COLOR_RADAR_TARGET_LINE
+
 
 # --- VISUALIZATION STYLING CONSTANTS ---
-FONT_FAMILY_DEFAULT = "Arial, sans-serif"
+FONT_FAMILY_DEFAULT = "Arial, Helvetica, sans-serif"
 FONT_SIZE_TITLE_DEFAULT = 16
-# ... (rest of your styling constants, KPI thresholds, COLUMN_MAP, PLACEHOLDER_TEXT, TEXT_STRINGS, File Paths - NO CHANGES NEEDED HERE for THIS error)
-# Ensure all these subsequent sections are complete and as they were in your last good version.
-# I will include them for completeness assuming they were correct before.
-
 FONT_SIZE_BODY_DEFAULT = 11
-FONT_SIZE_LEGEND = 10
+FONT_SIZE_LEGEND = 11
 FONT_SIZE_HOVER_LABEL = 11
 FONT_SIZE_AXIS_TITLE = 13
 FONT_SIZE_AXIS_TICKS = 10
@@ -101,15 +112,15 @@ FONT_FAMILY_TARGET_ANNOTATION = "Arial Black"
 FONT_SIZE_BAR_TEXT = 9
 FONT_SIZE_SUBTITLE = 10
 
-COLOR_PAPER_BACKGROUND = 'rgba(0,0,0,0)'
-COLOR_PLOT_BACKGROUND = 'rgba(0,0,0,0)'
-COLOR_TEXT_PRIMARY = "#222222"
+COLOR_PAPER_BACKGROUND = 'rgba(255,255,255,1)'
+COLOR_PLOT_BACKGROUND = 'rgba(255,255,255,1)'
+COLOR_TEXT_PRIMARY = "#1A1A1A"
 COLOR_HOVER_LABEL_BACKGROUND = "white"
-COLOR_LEGEND_BACKGROUND = "rgba(255,255,255,0.7)"
-COLOR_LEGEND_BORDER = 'rgba(0,0,0,0.1)'
-COLOR_GRID_PRIMARY = 'rgba(0,0,0,0.1)'
-COLOR_GRID_SECONDARY = 'rgba(0,0,0,0.05)'
-COLOR_AXIS_LINE = 'rgba(0,0,0,0.2)'
+COLOR_LEGEND_BACKGROUND = "rgba(255,255,255,0.85)"
+COLOR_LEGEND_BORDER = 'rgba(0,0,0,0.2)'
+COLOR_GRID_PRIMARY = 'rgba(0,0,0,0.15)'
+COLOR_GRID_SECONDARY = 'rgba(0,0,0,0.1)'
+COLOR_AXIS_LINE = 'rgba(0,0,0,0.4)'
 COLOR_SPIKE_LINE = 'rgba(0,0,0,0.3)'
 COLOR_RANGESELECTOR_BACKGROUND = 'rgba(230,230,230,0.7)'
 COLOR_RANGESELECTOR_BORDER = 'rgba(0,0,0,0.1)'
@@ -128,15 +139,16 @@ COLOR_GAUGE_NEEDLE_BORDER = "rgba(0,0,0,1)"
 COLOR_GAUGE_BACKGROUND = "rgba(255,255,255,0.0)"
 COLOR_GAUGE_BORDERCOLOR = "rgba(0,0,0,0.1)"
 
-COLOR_SCHEME_RADAR_DEFAULT = COLOR_SCHEME_PROFESSIONAL_LINES # Example: Defaulting to our curated list
-RADAR_FILL_OPACITY = 0.15
-COLOR_RADAR_POLAR_BACKGROUND = 'rgba(255,255,255,0)'
-COLOR_RADAR_AXIS_LINE = 'rgba(0,0,0,0.3)'
-COLOR_RADAR_GRID_LINE = "rgba(0,0,0,0.15)"
-COLOR_RADAR_ANGULAR_GRID_LINE = "rgba(0,0,0,0.1)"
-FONT_SIZE_RADAR_TICK = 9
-FONT_SIZE_RADAR_ANGULAR_TICK = 10
+COLOR_SCHEME_RADAR_DEFAULT = COLOR_SCHEME_RADAR_OPTIMAL
+RADAR_FILL_OPACITY = 0.10
+COLOR_RADAR_POLAR_BACKGROUND = COLOR_PLOT_BACKGROUND
+COLOR_RADAR_AXIS_LINE = 'rgba(0,0,0,0.5)'
+COLOR_RADAR_GRID_LINE = "rgba(0,0,0,0.25)"
+COLOR_RADAR_ANGULAR_GRID_LINE = "rgba(0,0,0,0.15)"
+FONT_SIZE_RADAR_TICK = 10
+FONT_SIZE_RADAR_ANGULAR_TICK = 11
 COLOR_RADAR_TICK_LABEL = COLOR_TEXT_PRIMARY
+COLOR_RADAR_ANGULAR_TICK_BACKGROUND = 'rgba(255,255,255,0.7)'
 
 FONT_SIZE_STRESS_SEMAFORO_NUMBER = 20
 FONT_SIZE_STRESS_SEMAFORO_TITLE = 12
@@ -185,6 +197,9 @@ COLUMN_MAP = {
     "overtime_hours": "overtime_hours", "unfilled_shifts": "unfilled_shifts",
     "stress_level_survey": "stress_level_survey",
     "workload_perception": "workload_perception", "psychological_signals": "psychological_signals",
+    "location_x": "location_x_coordinate",
+    "location_y": "location_y_coordinate",
+    "location_area_name": "area_name"
 }
 
 # --- UI PLACEHOLDER TEXTS ---
@@ -215,6 +230,8 @@ TEXT_STRINGS = {
         "check_file_path_instruction": "Please check the file path.",
         "exception_detail_prefix": "Exception",
         "chart_generation_error_label": "Chart Generation Error",
+        "module_in_development_warning": "Note: This module ('{module_name}') is a placeholder for future development and is not yet functional.",
+
 
         "navigation_label": "Navigation", "dashboard_nav_label": "Dashboard", "glossary_nav_label": "Glossary",
         "filters_header": "Dashboard Filters", "language_selector": "Language",
@@ -267,6 +284,15 @@ TEXT_STRINGS = {
         "workload_perception_label": "Perceived Workload", "psychological_signals_label": "Wellbeing Signals",
 
         "plant_map_title": "5. Interactive Facility Overview",
+        "facility_heatmap_title": "Facility Heatmap of Average Stress Levels",
+        "heatmap_no_coordinate_data": "Coordinate data (X, Y) is missing or insufficient to generate heatmap.",
+        "heatmap_no_value_data": "Metric data (e.g., Stress Level) is missing for heatmap locations.",
+        "x_coordinate_label": "X Coordinate",
+        "y_coordinate_label": "Y Coordinate",
+        "stress_level_label_short": "Stress Lvl.",
+        "individual_data_points_label": "Data Points",
+
+
         "ai_insights_title": "6. Predictive Risk Insights",
 
         "actionable_insights_title": "Actionable Insights & Recommendations",
@@ -277,6 +303,7 @@ TEXT_STRINGS = {
         "no_insights_generated_stress": "Stress indicators appear within acceptable ranges or data is insufficient for detailed trend analysis.",
         "no_data_for_engagement_insights": "Insufficient data to generate engagement insights.",
         "no_data_for_stress_insights": "Insufficient data to generate stress insights.",
+
 
         "no_data_available": "No data available for the selected filters in this module.",
         "no_data_for_selection": "No data for current selection.",
@@ -373,6 +400,8 @@ TEXT_STRINGS = {
         "check_file_path_instruction": "Por favor, verifique la ruta del archivo.",
         "exception_detail_prefix": "Excepción",
         "chart_generation_error_label": "Error al Generar Gráfico",
+        "module_in_development_warning": "Nota: Este módulo ('{module_name}') es un marcador de posición para desarrollo futuro y aún no es funcional.",
+
         "navigation_label": "Navegación", "dashboard_nav_label": "Tablero Principal", "glossary_nav_label": "Glosario",
         "filters_header": "Filtros del Tablero", "language_selector": "Idioma",
         "select_site": "Sitio(s):", "select_region": "Región(es):", "select_department": "Departamento(s):",
@@ -387,6 +416,7 @@ TEXT_STRINGS = {
         "date_label": "Fecha", "1y_range_label": "1A", "all_range_label": "Todo",
         "good_label": "Bueno", "warning_label": "Advertencia", "critical_label": "Crítico",
         "low_label": "Bajo", "moderate_label": "Moderado", "high_label": "Alto", "status_na_label": "N/D",
+
         "stability_panel_title": "1. Estabilidad Laboral",
         "rotation_rate_gauge": "Tasa de Rotación de Personal",
         "rotation_rate_metric_help": "Porcentaje de empleados que dejan la organización. Menor es mejor. Objetivo: < {target}%.",
@@ -394,12 +424,14 @@ TEXT_STRINGS = {
         "retention_metric_help": "Porcentaje de nuevas contrataciones que permanecen. Mayor es mejor. Objetivo: > {target}%.",
         "hires_vs_exits_chart_title": "Tendencias Mensuales de Contratación y Desvinculación",
         "hires_label": "Contrataciones", "exits_label": "Bajas",
+
         "safety_pulse_title": "2. Pulso de Seguridad",
         "monthly_incidents_chart_title": "Eventos de Seguridad Mensuales",
         "incidents_label": "Incidentes", "near_misses_label": "Casi Incidentes",
         "days_without_accidents_metric": "Días Desde Último Incidente Registrable",
         "days_no_incident_help": "Días sin incidentes graves. Objetivo: Maximizar.",
         "active_safety_alerts_metric": "Alertas de Seguridad Abiertas",
+
         "engagement_title": "3. Compromiso y Vinculación del Personal",
         "engagement_dimensions_radar_title": "Dimensiones Clave de Compromiso (Promedio)",
         "initiative_label": "Iniciativa", "punctuality_label": "Puntualidad",
@@ -409,6 +441,7 @@ TEXT_STRINGS = {
         "enps_metric_help": "Employee Net Promoter Score. Objetivo: > {target}.",
         "survey_participation_metric": "Tasa de Respuesta a Encuestas",
         "recognitions_count_metric": "Total de Reconocimientos Otorgados",
+
         "stress_title": "4. Estrés Operacional y Carga Laboral",
         "overall_stress_indicator_title": "Índice de Estrés Psicosocial",
         "stress_indicator_help": "Medida agregada del estrés laboral (escala 0-10). Menor es mejor. Objetivo: < {target}.",
@@ -416,7 +449,17 @@ TEXT_STRINGS = {
         "overtime_label": "Horas Extra", "unfilled_shifts_label": "Turnos Sin Cubrir",
         "workload_vs_psych_chart_title": "Percepción de Carga vs. Señales de Bienestar",
         "workload_perception_label": "Percepción de Carga Laboral", "psychological_signals_label": "Señales de Bienestar",
+
         "plant_map_title": "5. Vista Interactiva de Instalaciones",
+        "facility_heatmap_title": "Mapa de Calor de Niveles de Estrés Promedio en Instalación",
+        "heatmap_no_coordinate_data": "Faltan datos de coordenadas (X, Y) o son insuficientes para generar el mapa de calor.",
+        "heatmap_no_value_data": "Faltan datos de la métrica (ej. Nivel de Estrés) para las ubicaciones del mapa de calor.",
+        "x_coordinate_label": "Coordenada X",
+        "y_coordinate_label": "Coordenada Y",
+        "stress_level_label_short": "Nivel Estrés",
+        "individual_data_points_label": "Puntos de Dato",
+
+
         "ai_insights_title": "6. Perspectivas de Riesgo Predictivas",
         "actionable_insights_title": "Perspectivas Accionables y Recomendaciones",
         "no_insights_generated": "No se generaron perspectivas específicas para la selección actual. Los datos podrían estar en rangos normales o ser insuficientes.",
