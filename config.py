@@ -13,7 +13,7 @@ except ImportError:
     logger.warning("config.py: plotly.express could not be imported. Color schemes relying on 'px' will use hardcoded fallbacks.")
 
 # --- GENERAL APPLICATION SETTINGS ---
-APP_VERSION = "v1.0.9 (SpatialGrayBG)"
+APP_VERSION = "v1.0.10 (GrayPlotBG)"
 APP_TITLE_KEY = "app_title"
 APP_ICON = "🦺"
 
@@ -23,6 +23,7 @@ DEFAULT_REGIONS = []
 DEFAULT_DEPARTMENTS = []
 DEFAULT_FUNCTIONAL_CATEGORIES = []
 DEFAULT_SHIFTS = []
+
 
 # --- VISUALIZATION & THEME ---
 FALLBACK_PLOTLY_DEFAULT = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
@@ -55,7 +56,7 @@ def get_px_color_scheme(path_elements: list, fallback_scheme: list, scheme_name:
             logger.error(f"Error getting Plotly color scheme '{scheme_name}': {e}. Using fallback.")
             return fallback_scheme
     else:
-        logger.info(f"Plotly Express (px) not available. Using fallback for scheme '{scheme_name}'.")
+        logger.info(f"Plotly Express (px) not available. Using hardcoded fallback for scheme '{scheme_name}'.")
         return fallback_scheme
 
 COLOR_SCHEME_CATEGORICAL = get_px_color_scheme(["qualitative", "Plotly"], FALLBACK_PLOTLY_DEFAULT, "Plotly Default")
@@ -97,17 +98,17 @@ FONT_FAMILY_TARGET_ANNOTATION = "Arial Black"
 FONT_SIZE_BAR_TEXT = 9
 FONT_SIZE_SUBTITLE = 10
 
-COLOR_PAPER_BACKGROUND = 'rgba(0,0,0,0)'       # Transparent paper to inherit Streamlit app background
-COLOR_PLOT_BACKGROUND = '#F0F0F0'            # Light Gray plot background
-COLOR_TEXT_PRIMARY = "#1A1A1A"                # Near-black for text on light gray
+COLOR_PAPER_BACKGROUND = 'rgba(0,0,0,0)'       # Transparent paper
+COLOR_PLOT_BACKGROUND = '#F0F0F0'             # Light Gray plot area (CHANGED)
+COLOR_TEXT_PRIMARY = "#1A1A1A"
 COLOR_HOVER_LABEL_BACKGROUND = "white"
 COLOR_LEGEND_BACKGROUND = "rgba(255,255,255,0.85)"
 COLOR_LEGEND_BORDER = 'rgba(0,0,0,0.2)'
-COLOR_GRID_PRIMARY = 'rgba(0,0,0,0.1)'        # Grid lines need to contrast with #F0F0F0, make slightly darker/less transparent
-COLOR_GRID_SECONDARY = 'rgba(0,0,0,0.07)'     # Slightly lighter secondary grid
+COLOR_GRID_PRIMARY = 'rgba(0,0,0,0.15)'       # Adjusted for better contrast on gray
+COLOR_GRID_SECONDARY = 'rgba(0,0,0,0.1)'      # Adjusted for better contrast on gray
 COLOR_AXIS_LINE = 'rgba(0,0,0,0.4)'
 COLOR_SPIKE_LINE = 'rgba(0,0,0,0.3)'
-COLOR_RANGESELECTOR_BACKGROUND = 'rgba(200,200,200,0.7)' # Adjust if needed for contrast on new bg
+COLOR_RANGESELECTOR_BACKGROUND = 'rgba(200,200,200,0.7)'
 COLOR_RANGESELECTOR_BORDER = 'rgba(0,0,0,0.1)'
 COLOR_BAR_TEXT_INSIDE = "#FFFFFF"
 COLOR_BAR_TEXT_OUTSIDE = COLOR_TEXT_PRIMARY
@@ -121,31 +122,30 @@ FONT_SIZE_AXIS_TICKS_GAUGE = 9
 COLOR_GAUGE_TICK = "rgba(0,0,0,0.2)"
 COLOR_GAUGE_NEEDLE_BASE = "rgba(0,0,0,0.8)"
 COLOR_GAUGE_NEEDLE_BORDER = "rgba(0,0,0,1)"
-COLOR_GAUGE_BACKGROUND = "rgba(255,255,255,0.0)" # Gauges often look better transparent against plot_bg
+COLOR_GAUGE_BACKGROUND = "rgba(255,255,255,0.0)"
 COLOR_GAUGE_BORDERCOLOR = "rgba(0,0,0,0.1)"
 
 COLOR_SCHEME_RADAR_DEFAULT = COLOR_SCHEME_RADAR_OPTIMAL
 RADAR_FILL_OPACITY = 0.10
-COLOR_RADAR_POLAR_BACKGROUND = COLOR_PLOT_BACKGROUND # Use the new light gray
+COLOR_RADAR_POLAR_BACKGROUND = COLOR_PLOT_BACKGROUND # Use the gray plot background (CHANGED)
 COLOR_RADAR_AXIS_LINE = 'rgba(0,0,0,0.5)'
-COLOR_RADAR_GRID_LINE = "rgba(0,0,0,0.2)"    # More visible radial grid against light gray
-COLOR_RADAR_ANGULAR_GRID_LINE = "rgba(0,0,0,0.15)" # More visible angular grid against light gray
+COLOR_RADAR_GRID_LINE = "rgba(0,0,0,0.25)"    # Adjusted for gray background
+COLOR_RADAR_ANGULAR_GRID_LINE = "rgba(0,0,0,0.15)" # Adjusted for gray background
 FONT_SIZE_RADAR_TICK = 10
 FONT_SIZE_RADAR_ANGULAR_TICK = 11
 COLOR_RADAR_TICK_LABEL = COLOR_TEXT_PRIMARY
-COLOR_RADAR_ANGULAR_TICK_BACKGROUND = 'rgba(255,255,255,0.0)' # Keep transparent for angular ticks for now
+COLOR_RADAR_ANGULAR_TICK_BACKGROUND = 'rgba(255,255,255,0.0)' # Keep transparent
 
 FONT_SIZE_STRESS_SEMAFORO_NUMBER = 20
 FONT_SIZE_STRESS_SEMAFORO_TITLE = 12
 FONT_SIZE_STRESS_SEMAFORO_AXIS_TICK = 8
-COLOR_STRESS_BULLET_LOW = "rgba(46, 204, 113, 0.5)" # Slightly more opaque for gray bg
+COLOR_STRESS_BULLET_LOW = "rgba(46, 204, 113, 0.5)"
 COLOR_STRESS_BULLET_MEDIUM = "rgba(241, 196, 15, 0.5)"
 COLOR_STRESS_BULLET_HIGH = "rgba(231, 76, 60, 0.5)"
 COLOR_STRESS_BULLET_BAR_BORDER = 'rgba(0,0,0,0.3)'
-COLOR_STRESS_BULLET_BACKGROUND = "rgba(0,0,0,0)" # Transparent bullet background against plot_bg
+COLOR_STRESS_BULLET_BACKGROUND = "rgba(0,0,0,0)"
 COLOR_STRESS_BULLET_BORDER = "rgba(0,0,0,0.1)"
 
-# Heatmap/Spatial Dynamics
 HEATMAP_COLORSCALE_DEFAULT = "Jet"
 HEATMAP_NBINSX_DEFAULT = 50
 HEATMAP_NBINSY_DEFAULT = 30
@@ -155,7 +155,6 @@ HEATMAP_POINT_OPACITY = 0.4
 FACILITY_OUTLINE_COLOR = 'rgba(50,50,50,0.7)'
 FACILITY_AREA_LINE_COLOR = 'rgba(100,100,100,0.5)'
 FACILITY_AREA_FILL_COLOR = 'rgba(200,200,200,0.1)'
-
 
 DEFAULT_CHART_MARGINS = dict(l=50, r=30, t=70, b=50)
 EPSILON = 1e-9
@@ -215,9 +214,7 @@ Implementation requires significant historical data, trained machine learning mo
 **Crucially, the fairness, transparency, and ethical implications of any AI-driven predictions must be paramount considerations during development and deployment.**)
 """
 
-# --- TEXT STRINGS FOR LOCALIZATION ---
-# This section is very long, so I am keeping the structure as in your last verified complete version.
-# Ensure ALL keys and translations are present here.
+# --- TEXT STRINGS FOR LOCALIZATION (FULL VERSION) ---
 DEFAULT_LANG = "EN"
 TEXT_STRINGS = {
     "EN": {
@@ -231,6 +228,7 @@ TEXT_STRINGS = {
         "exception_detail_prefix": "Exception",
         "chart_generation_error_label": "Chart Generation Error",
         "module_in_development_warning": "Note: This module ('{module_name}') is a placeholder for future development and is not yet functional.",
+
 
         "navigation_label": "Navigation", "dashboard_nav_label": "Dashboard", "glossary_nav_label": "Glossary",
         "filters_header": "Dashboard Filters", "language_selector": "Language",
@@ -340,7 +338,6 @@ TEXT_STRINGS = {
         "language_name_full_EN": "English",
         "language_name_full_ES": "Español",
 
-        # ALL YOUR INSIGHT STRINGS from previous version go here...
         "rotation_high_alert": "High Rotation Alert",
         "rotation_high_insight_v2": "Average rotation ({rotation_val}%) significantly exceeds warning ({warn_thresh}%). Target is {target_thresh}%. Prioritize root cause analysis for high-turnover areas (filter dashboard) and review exit interview data. Implement targeted retention programs for critical roles.",
         "rotation_moderate_warn": "Rotation Warning",
@@ -453,7 +450,7 @@ TEXT_STRINGS = {
         "workload_vs_psych_chart_title": "Percepción de Carga vs. Señales de Bienestar",
         "workload_perception_label": "Percepción de Carga Laboral", "psychological_signals_label": "Señales de Bienestar",
 
-        "plant_map_title": "5. Vista Interactiva de Instalaciones", # Corrected based on previous title
+        "plant_map_title": "5. Vista Interactiva de Instalaciones",
         "facility_heatmap_title": "Mapa de Calor de Niveles de Estrés Promedio en Instalación",
         "facility_incident_heatmap_title": "Mapa de Calor de Densidad de Incidentes",
         "heatmap_no_coordinate_data": "Faltan datos suficientes de coordenadas X/Y para generar el mapa espacial.",
