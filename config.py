@@ -3,7 +3,7 @@ import plotly.express as px
 import pandas as pd # Not strictly needed here but often imported alongside
 
 # --- GENERAL APPLICATION SETTINGS ---
-APP_VERSION = "v1.0.1 (Config Fix)" # Incrementing for this fix
+APP_VERSION = "v1.0.2 (VizRefactor)" # Incrementing for this refactor
 APP_TITLE_KEY = "app_title" # Using a distinct key from dashboard_title for flexibility
 APP_ICON = "🦺" # Icon reflecting wellbeing, health
 
@@ -14,28 +14,97 @@ DEFAULT_DEPARTMENTS = []
 DEFAULT_FUNCTIONAL_CATEGORIES = []
 DEFAULT_SHIFTS = []
 
-# --- VISUALIZATION & THEME ---
-COLOR_SCHEME_CATEGORICAL = px.colors.qualitative.Plotly
-COLOR_SCHEME_SEQUENTIAL = px.colors.sequential.Viridis
+# --- VISUALIZATION & THEME (Existing) ---
+COLOR_SCHEME_CATEGORICAL = px.colors.qualitative.Plotly # Used as default for bar charts etc.
+COLOR_SCHEME_CATEGORICAL_SET2 = px.colors.qualitative.Set2 # Alternative, e.g. for trend lines
+COLOR_SCHEME_SEQUENTIAL = px.colors.sequential.Viridis # Example, not heavily used yet
 
 COLOR_STATUS_GOOD = "#2ECC71"
 COLOR_STATUS_WARNING = "#F1C40F"
 COLOR_STATUS_CRITICAL = "#E74C3C"
 COLOR_NEUTRAL_INFO = "#3498DB"
-COLOR_TEXT_SECONDARY = "#566573"
+COLOR_TEXT_SECONDARY = "#566573"  # Already used for subtitles, axis ticks, some labels
 COLOR_TARGET_LINE = "#2c3e50"
+
+# --- VISUALIZATION STYLING CONSTANTS (New/Enhanced - For Refactored visualizations.py) ---
+FONT_FAMILY_DEFAULT = "Arial, sans-serif"
+FONT_SIZE_TITLE_DEFAULT = 16        # Main chart titles
+FONT_SIZE_BODY_DEFAULT = 11         # General text on charts (e.g. _apply_standard_layout default font)
+FONT_SIZE_LEGEND = 10
+FONT_SIZE_HOVER_LABEL = 11
+FONT_SIZE_AXIS_TITLE = 13         # Titles for X and Y axes
+FONT_SIZE_AXIS_TICKS = 10         # Tick labels on X and Y axes
+FONT_SIZE_RANGESELECTOR_BUTTONS = 10
+FONT_SIZE_ANNOTATION_SMALL = 9      # For average line text, etc.
+FONT_SIZE_ANNOTATION_TARGET = 10
+FONT_FAMILY_TARGET_ANNOTATION = "Arial Black" # Specific font for target annotations
+FONT_SIZE_BAR_TEXT = 9              # Data labels on bars
+FONT_SIZE_SUBTITLE = 10             # Subtitle for KPI Gauge title (smaller than main title)
+
+# Colors for Chart Elements
+COLOR_PAPER_BACKGROUND = 'rgba(0,0,0,0)'    # Transparent paper background for charts
+COLOR_PLOT_BACKGROUND = 'rgba(0,0,0,0)'     # Transparent plot area background
+COLOR_TEXT_PRIMARY = "#222222"          # Primary text color (titles, labels if not config.COLOR_TEXT_SECONDARY)
+COLOR_HOVER_LABEL_BACKGROUND = "white"
+COLOR_LEGEND_BACKGROUND = "rgba(255,255,255,0.7)" # Semi-transparent white
+COLOR_LEGEND_BORDER = 'rgba(0,0,0,0.1)'   # Light border for legend box
+COLOR_GRID_PRIMARY = 'rgba(0,0,0,0.1)'      # Typically Y-axis grid lines
+COLOR_GRID_SECONDARY = 'rgba(0,0,0,0.05)'   # Typically X-axis grid lines
+COLOR_AXIS_LINE = 'rgba(0,0,0,0.2)'       # Color for X and Y axis lines
+COLOR_SPIKE_LINE = 'rgba(0,0,0,0.3)'      # Color for hover spikes in trend charts
+COLOR_RANGESELECTOR_BACKGROUND = 'rgba(230,230,230,0.7)'
+COLOR_RANGESELECTOR_BORDER = 'rgba(0,0,0,0.1)'
+COLOR_BAR_TEXT_INSIDE = "#FFFFFF"           # Text on dark part of stacked bars
+COLOR_BAR_TEXT_OUTSIDE = COLOR_TEXT_PRIMARY # Text outside bars, or on light bars
+COLOR_BAR_MARKER_BORDER = 'rgba(0,0,0,0.3)' # Border for individual bars
+COLOR_ANNOTATION_BG = "rgba(255,255,255,0.8)" # Background for annotations on hlines
+
+# Specific Component Colors (Gauge)
+FONT_SIZE_TITLE_GAUGE = 13           # Title of the gauge number itself
+FONT_SIZE_GAUGE_NUMBER = 30
+FONT_SIZE_GAUGE_DELTA = 12
+FONT_SIZE_AXIS_TICKS_GAUGE = 9       # Ticks on the gauge axis
+COLOR_GAUGE_TICK = "rgba(0,0,0,0.2)" # Tick marks on the gauge axis
+COLOR_GAUGE_NEEDLE_BASE = "rgba(0,0,0,0.8)" # Color of the gauge needle/bar
+COLOR_GAUGE_NEEDLE_BORDER = "rgba(0,0,0,1)"
+COLOR_GAUGE_BACKGROUND = "rgba(255,255,255,0.0)" # Background of the gauge area itself
+COLOR_GAUGE_BORDERCOLOR = "rgba(0,0,0,0.1)"    # Border of the gauge area
+
+# Specific Component Colors (Radar)
+COLOR_SCHEME_RADAR_DEFAULT = px.colors.qualitative.Vivid # Color scheme for radar series
+COLOR_RADAR_POLAR_BACKGROUND = "rgba(248,248,248,0.0)" # Background of the polar plot area
+COLOR_RADAR_AXIS_LINE = 'rgba(0,0,0,0.15)' # Radial and angular axis lines
+COLOR_RADAR_GRID_LINE = "rgba(0,0,0,0.1)" # Radial grid lines (circles)
+COLOR_RADAR_ANGULAR_GRID_LINE = "rgba(0,0,0,0.05)" # Angular grid lines (spokes)
+FONT_SIZE_RADAR_TICK = 8            # Tick labels on radial axis
+FONT_SIZE_RADAR_ANGULAR_TICK = 9    # Tick labels on angular axis (category names)
+
+# Specific Component Colors (Stress Semáforo/Bullet)
+FONT_SIZE_STRESS_SEMAFORO_NUMBER = 20
+FONT_SIZE_STRESS_SEMAFORO_TITLE = 12 # For the "LOW", "MODERATE", "HIGH" text
+FONT_SIZE_STRESS_SEMAFORO_AXIS_TICK = 8
+COLOR_STRESS_BULLET_LOW = "rgba(46, 204, 113, 0.4)"    # Background color for "low" step
+COLOR_STRESS_BULLET_MEDIUM = "rgba(241, 196, 15, 0.4)" # Background color for "medium" step
+COLOR_STRESS_BULLET_HIGH = "rgba(231, 76, 60, 0.4)"     # Background color for "high" step
+COLOR_STRESS_BULLET_BAR_BORDER = 'rgba(0,0,0,0.3)'  # Border for the value bar in bullet
+COLOR_STRESS_BULLET_BACKGROUND = "rgba(255,255,255,0)" # Background of the bullet gauge area
+COLOR_STRESS_BULLET_BORDER = "rgba(0,0,0,0.1)"        # Border of the bullet gauge area
+
+# Margins
+DEFAULT_CHART_MARGINS = dict(l=50, r=30, t=70, b=50) # General default margins for most charts
+EPSILON = 1e-9 # For float comparisons, also used in visualizations.py
 
 # --- KPI THRESHOLDS & TARGETS ---
 STABILITY_ROTATION_RATE = { "good": 8.0, "warning": 15.0, "target": 8.0 }
 STABILITY_RETENTION = { "good": 90.0, "warning": 75.0 }
-SAFETY_INCIDENTS = { "good": 1.0, "warning": 5.0, "target": 0.0 }
+SAFETY_INCIDENTS = { "good": 1.0, "warning": 5.0, "target": 0.0 } # Note: 'good' might be 0, depending on definition. If 'good' is <=1, then target=0 is fine.
 SAFETY_DAYS_NO_INCIDENTS = { "good": 180, "warning": 90 }
 STRESS_LEVEL_PSYCHOSOCIAL = { "low": 3.5, "medium": 7.0, "max_scale": 10.0 }
 ENGAGEMENT_ENPS = { "good": 50.0, "warning": 10.0 }
 ENGAGEMENT_CLIMATE_SCORE = { "good": 80.0, "warning": 60.0 }
 ENGAGEMENT_PARTICIPATION = { "good": 75.0 }
 ENGAGEMENT_RADAR_DIM_TARGET = 4.0
-ENGAGEMENT_RADAR_DIM_SCALE_MAX = 5.0
+ENGAGEMENT_RADAR_DIM_SCALE_MAX = 5.0 # Used by visualizations.py for radar axis scaling
 
 # --- COLUMN MAPPING (Conceptual Keys to Actual CSV Column Names) ---
 COLUMN_MAP = {
@@ -50,7 +119,7 @@ COLUMN_MAP = {
         "initiative": "initiative", "punctuality": "punctuality",
         "recognition": "recognition_data", "feedback": "feedback_data",
     },
-    "engagement_radar_dims_labels": {
+    "engagement_radar_dims_labels": { # These are keys for TEXT_STRINGS to get localized labels
         "initiative": "initiative_label", "punctuality": "punctuality_label",
         "recognition": "recognition_label", "feedback": "feedback_label",
     },
@@ -78,9 +147,9 @@ Implementation requires significant historical data, trained machine learning mo
 """
 
 # --- TEXT STRINGS FOR LOCALIZATION (i18n) ---
-DEFAULT_LANG = "EN"
+DEFAULT_LANG = "EN" # Used by visualizations.py and insights.py
 
-TEXT_STRINGS = {
+TEXT_STRINGS = { # Used by visualizations.py, insights.py and app.py
     "EN": {
         "app_title": "Laboral Vital Signs",
         "dashboard_title": "Laboral Vital Signs Dashboard",
@@ -88,9 +157,10 @@ TEXT_STRINGS = {
         "alignment_note": "Aligned with NOM-035-STPS-2018, ISO 45003, and DEI principles.",
         "psych_safety_note": "Note: Data concerning individual wellbeing is aggregated and presented anonymously to uphold psychological safety, privacy, and align with DEI principles and regulatory standards.",
         "error_loading_data": "Error loading data from file: {}. Ensure the file exists and is correctly formatted.",
-        "check_file_path_instruction": "Please check the file path.", # Added from app.py
-        "exception_detail_prefix": "Exception", # Added from app.py
-        
+        "check_file_path_instruction": "Please check the file path.",
+        "exception_detail_prefix": "Exception",
+        "chart_generation_error_label": "Chart Generation Error", # New, for visualization errors
+
         "navigation_label": "Navigation", "dashboard_nav_label": "Dashboard", "glossary_nav_label": "Glossary",
         "filters_header": "Dashboard Filters", "language_selector": "Language",
         "select_site": "Site(s):", "select_region": "Region(s):", "select_department": "Department(s):",
@@ -103,9 +173,13 @@ TEXT_STRINGS = {
         "days_unit": "days", "percentage_label": "Percentage (%)", "score_label": "Score",
         "average_score_label": "Average Score", "hours_or_shifts_label": "Hours / Count",
         "dimension_label": "Dimension",
+        "date_label": "Date", # Added for hovertemplate in trend chart
+        "1y_range_label": "1Y", # Added for trend chart range selector
+        "all_range_label": "All", # Added for trend chart range selector
 
-        "good_label": "Good", "warning_label": "Warning", "critical_label": "Critical",
-        "low_label": "Low", "moderate_label": "Moderate", "high_label": "High", "status_na_label": "N/A",
+        "good_label": "Good", "warning_label": "Warning", "critical_label": "Critical", # Gauge step labels
+        "low_label": "Low", "moderate_label": "Moderate", "high_label": "High", # Stress indicator labels
+        "status_na_label": "N/A", # General N/A, and for metric card formatting
 
         "stability_panel_title": "1. Laboral Stability",
         "rotation_rate_gauge": "Employee Rotation Rate",
@@ -124,8 +198,8 @@ TEXT_STRINGS = {
 
         "engagement_title": "3. Employee Engagement & Commitment",
         "engagement_dimensions_radar_title": "Key Engagement Dimensions (Avg. Score)",
-        "initiative_label": "Initiative", "punctuality_label": "Punctuality",
-        "recognition_label": "Recognition Culture", "feedback_label": "Feedback Environment",
+        "initiative_label": "Initiative", "punctuality_label": "Punctuality", # For radar dimension display
+        "recognition_label": "Recognition Culture", "feedback_label": "Feedback Environment", # For radar dimension display
         "labor_climate_score_metric": "Work Climate Index",
         "enps_metric": "eNPS",
         "enps_metric_help": "Employee Net Promoter Score. Target: > {target}.",
@@ -147,18 +221,18 @@ TEXT_STRINGS = {
         "no_insights_generated": "No specific insights generated for the current selection. Data may be within normal ranges or insufficient for detailed analysis.",
         "no_insights_generated_stability": "Stability metrics appear within defined targets or data is insufficient for detailed trend analysis.",
         "no_insights_generated_safety": "Safety metrics indicate performance within acceptable ranges or data is insufficient for specific alerts.",
-        "no_insights_generated_engagement": "Engagement indicators are generally positive or data is insufficient for specific recommendations.", # Used in app.py but might be the general key "engagement_no_critical_insights" from insights.py is better
+        "no_insights_generated_engagement": "Engagement indicators are generally positive or data is insufficient for specific recommendations.",
         "no_insights_generated_stress": "Stress indicators appear within acceptable ranges or data is insufficient for detailed trend analysis.",
-        "no_data_for_engagement_insights": "Insufficient data to generate engagement insights.", # Used in insights.py
-        "no_data_for_stress_insights": "Insufficient data to generate stress insights.", # Used in insights.py
+        "no_data_for_engagement_insights": "Insufficient data to generate engagement insights.",
+        "no_data_for_stress_insights": "Insufficient data to generate stress insights.",
 
 
         "no_data_available": "No data available for the selected filters in this module.",
-        "no_data_for_selection": "No data for current selection.",
+        "no_data_for_selection": "No data for current selection.", # Generic, used by _create_no_data_figure
         "no_data_hires_exits": "Hires/Exits data not available for trend.",
         "no_data_incidents_near_misses": "Incident/Near Miss data not available for chart.",
         "no_data_radar_columns": "Required engagement dimension columns are missing.",
-        "no_data_radar": "Insufficient data for engagement radar chart.",
+        "no_data_radar": "Insufficient data for engagement radar chart.", # Specific, for radar in viz and app
         "no_data_shift_load": "Shift load data not available for chart.",
         "no_data_workload_psych": "Workload/Wellbeing signal data not available for trend.",
 
@@ -198,7 +272,7 @@ TEXT_STRINGS = {
         "retention_low_insight_v2": "12-month retention ({retention_val}%) is critically low (below {warn_thresh}%). Target is {target_thresh}%. Investigate early attrition causes: onboarding effectiveness, manager support, role clarity, and growth opportunities within the first year.",
         "retention_needs_improvement":"12-Month Retention Needs Improvement",
         "retention_improvement_insight_v2":"12-month retention ({retention_val}%) is below target ({target_thresh}%). Identify and address factors impacting new hire experience and commitment.",
-        "retention_good_status": "Good 12m Retention", # General status for retention
+        "retention_good_status": "Good 12m Retention",
         "retention_good_insight_detail": "12-month retention ({retention_val}%) meets/exceeds target ({target_thresh}%). Current strategies appear effective. Continue monitoring.",
         "review_hires_exits_trend":"Review Hires vs. Exits Trend",
         "hires_exits_insight_detail": "Analyze patterns. Sustained net employee loss requires strategic workforce planning adjustments.",
@@ -255,6 +329,8 @@ TEXT_STRINGS = {
         "error_loading_data": "Error al cargar datos del archivo: {}. Asegúrese de que el archivo exista y esté formateado correctamente.",
         "check_file_path_instruction": "Por favor, verifique la ruta del archivo.",
         "exception_detail_prefix": "Excepción",
+        "chart_generation_error_label": "Error al Generar Gráfico",
+
         "navigation_label": "Navegación", "dashboard_nav_label": "Tablero Principal", "glossary_nav_label": "Glosario",
         "filters_header": "Filtros del Tablero", "language_selector": "Idioma",
         "select_site": "Sitio(s):", "select_region": "Región(es):", "select_department": "Departamento(s):",
@@ -266,6 +342,10 @@ TEXT_STRINGS = {
         "days_unit": "días", "percentage_label": "Porcentaje (%)", "score_label": "Puntuación",
         "average_score_label": "Puntuación Promedio", "hours_or_shifts_label": "Horas / Cantidad",
         "dimension_label": "Dimensión",
+        "date_label": "Fecha",
+        "1y_range_label": "1A",
+        "all_range_label": "Todo",
+
         "good_label": "Bueno", "warning_label": "Advertencia", "critical_label": "Crítico",
         "low_label": "Bajo", "moderate_label": "Moderado", "high_label": "Alto", "status_na_label": "N/D",
         "stability_panel_title": "1. Estabilidad Laboral",
@@ -395,6 +475,13 @@ TEXT_STRINGS = {
 # --- File Paths ---
 # Assuming CSVs are in the same directory as app.py.
 # If in a 'data/' subfolder, change to e.g., "data/stability_data.csv"
+STABILITY_DATA_FILE = "stability_data.csv"
+SAFETY_DATA_FILE = "safety_data.csv"
+ENGAGEMENT_DATA_FILE = "engagement_data.csv"
+STRESS_DATA_FILE = "stress_data.csv"
+
+# (Optional) Consider a master toggle for development features like printing debug info
+# DEV_MODE_ACTIVE = False # Set to True to enable extra print statements for debugging, False for production
 STABILITY_DATA_FILE = "stability_data.csv"
 SAFETY_DATA_FILE = "safety_data.csv"
 ENGAGEMENT_DATA_FILE = "engagement_data.csv"
