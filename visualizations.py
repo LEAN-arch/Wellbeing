@@ -43,7 +43,7 @@ def get_semaforo_color(status: Optional[str]) -> str:
     return config.COLOR_TEXT_SECONDARY
 
 
-# --- Centralized Layout Helper (Corrected) ---
+# --- Centralized Layout Helper (Corrected for ValueError and legend handling) ---
 def _apply_standard_layout(fig: go.Figure,
                            lang: str,
                            title_text_direct: str,
@@ -70,20 +70,27 @@ def _apply_standard_layout(fig: go.Figure,
             namelength=-1
         ),
         "margin": margin_params if margin_params is not None else config.DEFAULT_CHART_MARGINS,
-        "xaxis": {}, 
+        # Initialize xaxis and yaxis as empty dicts to allow for title_text to be added
+        "xaxis": {},
         "yaxis": {}
     }
-    if x_axis_title_key:
-        layout_settings["xaxis"]["title_text"] = get_lang_text(lang, x_axis_title_key, x_axis_title_key)
-    if y_axis_title_key:
-        layout_settings["yaxis"]["title_text"] = get_lang_text(lang, y_axis_title_key, y_axis_title_key)
 
-    show_legend_flag = True 
+    if x_axis_title_key:
+        # Plotly expects axis titles under xaxis.title.text or yaxis.title.text
+        layout_settings["xaxis"]["title"] = {"text": get_lang_text(lang, x_axis_title_key, x_axis_title_key)}
+    if y_axis_title_key:
+        layout_settings["yaxis"]["title"] = {"text": get_lang_text(lang, y_axis_title_key, y_axis_title_key)}
+
+
+    # Default legend styling from config, merged with specific params
+    show_legend_flag = True # Default to show legend unless explicitly told not to
     if legend_params is not None:
+        # Pop 'showlegend' if it exists, to handle it separately and not pass it into final_legend_settings
         if "showlegend" in legend_params:
-            show_legend_flag = legend_params.pop("showlegend") 
-        if show_legend_flag:
-            final_legend_settings = {
+            show_legend_flag = legend_params.pop("showlegend")
+
+        if show_legend_flag: # Only configure legend if it's meant to be shown
+            final_legend_settings = { # Base defaults for legend
                 "orientation": "h", "yanchor": "top", "y": -0.15,
                 "xanchor": "center", "x": 0.5,
                 "font_size": config.FONT_SIZE_LEGEND,
@@ -92,9 +99,12 @@ def _apply_standard_layout(fig: go.Figure,
                 "bordercolor": config.COLOR_LEGEND_BORDER,
                 "borderwidth": 1
             }
+            # legend_params now contains only overrides/additions to the defaults
             final_legend_settings.update(legend_params)
             layout_settings["legend"] = final_legend_settings
-    layout_settings["showlegend"] = show_legend_flag
+
+    layout_settings["showlegend"] = show_legend_flag # Set the master showlegend flag
+
 
     if extra_layout_updates:
         for key, val in extra_layout_updates.items():
@@ -104,7 +114,9 @@ def _apply_standard_layout(fig: go.Figure,
                 layout_settings[key] = current_sub_dict
             else:
                 layout_settings[key] = val
+
     fig.update_layout(**layout_settings)
+
 
 # --- Standardized No Data Figure ---
 def _create_no_data_figure(lang: str, title_key_for_base: str,
@@ -118,8 +130,9 @@ def _create_no_data_figure(lang: str, title_key_for_base: str,
         extra_layout_updates={
             "title": dict(x=0.5, y=0.9, xanchor='center', yanchor='middle',
                           font_size=config.FONT_SIZE_TITLE_DEFAULT - 2),
-            "xaxis_visible": False, "yaxis_visible": False,
-            "showlegend": False,
+            "xaxis_visible": False,
+            "yaxis_visible": False,
+            "showlegend": False, # Explicitly hide legend
             "plot_bgcolor": config.COLOR_PAPER_BACKGROUND,
         }
     )
@@ -294,11 +307,14 @@ def create_trend_chart(df_input: pd.DataFrame, date_col: str,
                            x_axis_title_key=x_axis_title_key, y_axis_title_key=y_axis_title_key,
                            legend_params=legend_params_trend, margin_params=margin_params)
     fig.update_layout(
-        xaxis_gridcolor=config.COLOR_GRID_SECONDARY, # Applied directly to layout, will be merged by _apply_standard_layout
+        # These specific xaxis/yaxis properties are set *after* _apply_standard_layout
+        # so they correctly build upon the structure it created (like xaxis.title)
+        # If they were passed in extra_layout_updates, _apply_standard_layout's merge logic would handle it.
+        xaxis_gridcolor=config.COLOR_GRID_SECONDARY,
         yaxis_gridcolor=config.COLOR_GRID_PRIMARY,
         yaxis_tickformat=(y_axis_format_str if y_axis_format_str else None),
     )
-    fig.update_xaxes( # Using update_xaxes to modify the xaxis object built by _apply_standard_layout
+    fig.update_xaxes( # Using update_xaxes for specific axis properties to ensure they modify the existing axis object
          type='date', showspikes=True, spikemode='across+marker', spikesnap='cursor', spikethickness=1,
          spikedash='solid', spikecolor=config.COLOR_SPIKE_LINE,
          rangeslider_visible= len(df[date_col].unique()) > 15,
@@ -476,21 +492,19 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
     has_groups_on_radar = group_col and group_col in df_radar.columns and df_radar[group_col].nunique() > 0
     plot_data_exists = False
 
-    all_teams_name_variants = ["ALL TEAM", "ALL TEAMS", "AVERAGE", "OVERALL", "GLOBAL", "PROMEDIO", "TODOS"] # Include Spanish variants
+    all_teams_name_variants = ["ALL TEAM", "ALL TEAMS", "AVERAGE", "OVERALL", "GLOBAL", "PROMEDIO", "TODOS"]
     primary_group_name = None
     if has_groups_on_radar:
         unique_groups = df_radar[group_col].unique()
         for variant in all_teams_name_variants:
-            # Try case-insensitive matching for robustness
             matching_groups = [g for g in unique_groups if str(g).strip().upper() == variant.upper()]
             if matching_groups:
-                primary_group_name = matching_groups[0] # Use the actual name from data
+                primary_group_name = matching_groups[0]
                 break
     
     plotted_groups_count = 0
 
     if has_groups_on_radar:
-        # Plot "ALL TEAM" or primary group first if identified
         if primary_group_name:
             group_data_radar_df = df_radar[df_radar[group_col] == primary_group_name]
             if not group_data_radar_df.empty and not group_data_radar_df[values_col].dropna().empty:
@@ -506,10 +520,6 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
                     hovertemplate='<b>%{theta}</b><br>' + f'{str(primary_group_name)}: %{{r:.1f}}<extra></extra>' ))
                 plotted_groups_count += 1
 
-        # Plot other groups, ensuring original unique group order is somewhat preserved
-        # Iterating over unique groups maintains order of appearance if groupby sort=False is used.
-        # However, if primary_group_name was plucked out, the iteration order needs care.
-        # A simpler approach for remaining groups:
         other_groups_df = df_radar[df_radar[group_col] != primary_group_name] if primary_group_name else df_radar
         for name_grp_radar_plot, group_data_radar_df in other_groups_df.groupby(group_col, sort=False):
             if not group_data_radar_df.empty and not group_data_radar_df[values_col].dropna().empty: plot_data_exists = True
@@ -524,7 +534,7 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
                 opacity=fill_opacity,
                 hovertemplate='<b>%{theta}</b><br>' + f'{str(name_grp_radar_plot)}: %{{r:.1f}}<extra></extra>' ))
             plotted_groups_count += 1
-    else: # Single series
+    else:
         if values_col in df_radar.columns and not df_radar[values_col].dropna().empty:
             plot_data_exists = True
             single_series_ordered_df = pd.DataFrame({categories_col: all_categories_ordered_list}).merge(
@@ -580,7 +590,6 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
                 showticklabels=True, layer='below traces',
             )
         )
-        # plot_bgcolor set by _apply_standard_layout
     )
     return fig
 
