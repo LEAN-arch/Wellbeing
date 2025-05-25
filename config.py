@@ -3,25 +3,17 @@ import plotly.express as px
 import pandas as pd
 import logging
 
-# Initialize logger for this module
 logger = logging.getLogger(__name__)
-
-# Attempt to import plotly.express, but make it non-fatal for config definition
-# This block is more for if px might be optionally used or for extreme robustness.
-# Given the direct use below, if plotly.express is not installed,
-# the AttributeError will occur anyway, which is an acceptable failure for a missing dependency.
 try:
     import plotly.express as px
     PLOTLY_AVAILABLE = True
 except ImportError:
-    px = None # Define px as None if plotly.express cannot be imported
+    px = None
     PLOTLY_AVAILABLE = False
-    # Use logger instead of print for warnings/errors if this module might be imported in non-interactive contexts
     logger.warning("config.py: plotly.express could not be imported. Color schemes relying on 'px' will use hardcoded fallbacks.")
 
-
 # --- GENERAL APPLICATION SETTINGS ---
-APP_VERSION = "v1.0.6 (CompleteConfigFix)"
+APP_VERSION = "v1.0.9 (SpatialGrayBG)"
 APP_TITLE_KEY = "app_title"
 APP_ICON = "🦺"
 
@@ -32,10 +24,7 @@ DEFAULT_DEPARTMENTS = []
 DEFAULT_FUNCTIONAL_CATEGORIES = []
 DEFAULT_SHIFTS = []
 
-
 # --- VISUALIZATION & THEME ---
-
-# Default hardcoded fallbacks - these are standard Plotly palettes
 FALLBACK_PLOTLY_DEFAULT = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
 FALLBACK_SET2 = ['#66c2a5', '#fc8d62', '#8da0cb', '#e78ac3', '#a6d854', '#ffd92f', '#e5c494', '#b3b3b3']
 FALLBACK_ACCENT = ['#7fc97f', '#beaed4', '#fdc086', '#ffff99', '#386cb0', '#f0027f', '#bf5b17', '#666666']
@@ -43,32 +32,30 @@ FALLBACK_DARK2 = ['#1b9e77', '#d95f02', '#7570b3', '#e7298a', '#66a61e', '#e6ab0
 FALLBACK_PASTEL = ['#a6cee3', '#1f78b4', '#b2df8a', '#33a02c', '#fb9a99', '#e31a1c', '#fdbf6f', '#ff7f00', '#cab2d6', '#6a3d9a', '#ffff99', '#b15928']
 FALLBACK_VIRIDIS = ['#440154', '#472c7a', '#3b528b', '#2c728e', '#21918c', '#28ae80', '#5ec962', '#addc30', '#fde725']
 
-# Function to safely get color schemes
 def get_px_color_scheme(path_elements: list, fallback_scheme: list, scheme_name: str) -> list:
-    if PLOTLY_AVAILABLE and px: # Check if px was successfully imported
+    if PLOTLY_AVAILABLE and px:
         current_level = px.colors
         try:
             for element in path_elements:
                 current_level = getattr(current_level, element)
             if isinstance(current_level, list):
                 return current_level
-            elif hasattr(current_level, '_deprecated_ môžete_použiť_implicitné_konverzie_') and hasattr(current_level, 'to_list'): # Adapt for some Plotly color objects
+            if hasattr(current_level, '_rgb_str_list'):
+                return list(current_level._rgb_str_list())
+            if hasattr(current_level, 'colors') and isinstance(current_level.colors, list):
+                return current_level.colors
+            if callable(getattr(current_level, 'to_list', None)):
                 return current_level.to_list()
-            elif callable(current_level):
-                 # For cases like px.colors.sample_colorscale, which needs arguments
-                 logger.warning(f"Plotly color scheme '{scheme_name}' is a function and cannot be called without args here. Using fallback.")
-                 return fallback_scheme
-            else:
-                logger.warning(f"Plotly color scheme '{scheme_name}' at px.colors.{'.'.join(path_elements)} did not return a list. Type was {type(current_level)}. Using fallback.")
-                return fallback_scheme
+            logger.warning(f"Plotly color scheme '{scheme_name}' at px.colors.{'.'.join(path_elements)} did not directly yield a list. Type was {type(current_level)}. Using fallback.")
+            return fallback_scheme
         except AttributeError:
-            logger.warning(f"Path px.colors.{'.'.join(path_elements)} for '{scheme_name}' not found in Plotly Express. Using hardcoded fallback.")
+            logger.warning(f"Path px.colors.{'.'.join(path_elements)} for '{scheme_name}' not found. Using fallback.")
             return fallback_scheme
         except Exception as e:
-            logger.error(f"Unexpected error getting Plotly color scheme '{scheme_name}': {e}. Using hardcoded fallback.")
+            logger.error(f"Error getting Plotly color scheme '{scheme_name}': {e}. Using fallback.")
             return fallback_scheme
-    else: # px is None because plotly.express was not imported
-        logger.info(f"Plotly Express (px) not available. Using hardcoded fallback for scheme '{scheme_name}'.")
+    else:
+        logger.info(f"Plotly Express (px) not available. Using fallback for scheme '{scheme_name}'.")
         return fallback_scheme
 
 COLOR_SCHEME_CATEGORICAL = get_px_color_scheme(["qualitative", "Plotly"], FALLBACK_PLOTLY_DEFAULT, "Plotly Default")
@@ -81,8 +68,7 @@ COLOR_SCHEME_PROFESSIONAL_LINES = [
     "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"
 ]
 COLOR_SCHEME_SEQUENTIAL = get_px_color_scheme(["sequential", "Viridis"], FALLBACK_VIRIDIS, "Viridis")
-
-COLOR_SCHEME_RADAR_OPTIMAL = [ # SME Curated Palette
+COLOR_SCHEME_RADAR_OPTIMAL = [
     '#4477AA', '#EE6677', '#228833', '#CCBB44', '#66CCEE', '#AA3377', '#BBBBBB',
     '#0077BB', '#EE7733', '#009988', '#EE3377', '#33BBEE'
 ]
@@ -95,7 +81,6 @@ COLOR_STATUS_CRITICAL = "#E74C3C"
 COLOR_NEUTRAL_INFO = "#3498DB"
 COLOR_TEXT_SECONDARY = "#566573"
 COLOR_TARGET_LINE = COLOR_RADAR_TARGET_LINE
-
 
 # --- VISUALIZATION STYLING CONSTANTS ---
 FONT_FAMILY_DEFAULT = "Arial, Helvetica, sans-serif"
@@ -112,17 +97,17 @@ FONT_FAMILY_TARGET_ANNOTATION = "Arial Black"
 FONT_SIZE_BAR_TEXT = 9
 FONT_SIZE_SUBTITLE = 10
 
-COLOR_PAPER_BACKGROUND = 'rgba(255,255,255,1)'
-COLOR_PLOT_BACKGROUND = 'rgba(255,255,255,1)'
-COLOR_TEXT_PRIMARY = "#1A1A1A"
+COLOR_PAPER_BACKGROUND = 'rgba(0,0,0,0)'       # Transparent paper to inherit Streamlit app background
+COLOR_PLOT_BACKGROUND = '#F0F0F0'            # Light Gray plot background
+COLOR_TEXT_PRIMARY = "#1A1A1A"                # Near-black for text on light gray
 COLOR_HOVER_LABEL_BACKGROUND = "white"
 COLOR_LEGEND_BACKGROUND = "rgba(255,255,255,0.85)"
 COLOR_LEGEND_BORDER = 'rgba(0,0,0,0.2)'
-COLOR_GRID_PRIMARY = 'rgba(0,0,0,0.15)'
-COLOR_GRID_SECONDARY = 'rgba(0,0,0,0.1)'
+COLOR_GRID_PRIMARY = 'rgba(0,0,0,0.1)'        # Grid lines need to contrast with #F0F0F0, make slightly darker/less transparent
+COLOR_GRID_SECONDARY = 'rgba(0,0,0,0.07)'     # Slightly lighter secondary grid
 COLOR_AXIS_LINE = 'rgba(0,0,0,0.4)'
 COLOR_SPIKE_LINE = 'rgba(0,0,0,0.3)'
-COLOR_RANGESELECTOR_BACKGROUND = 'rgba(230,230,230,0.7)'
+COLOR_RANGESELECTOR_BACKGROUND = 'rgba(200,200,200,0.7)' # Adjust if needed for contrast on new bg
 COLOR_RANGESELECTOR_BORDER = 'rgba(0,0,0,0.1)'
 COLOR_BAR_TEXT_INSIDE = "#FFFFFF"
 COLOR_BAR_TEXT_OUTSIDE = COLOR_TEXT_PRIMARY
@@ -136,29 +121,41 @@ FONT_SIZE_AXIS_TICKS_GAUGE = 9
 COLOR_GAUGE_TICK = "rgba(0,0,0,0.2)"
 COLOR_GAUGE_NEEDLE_BASE = "rgba(0,0,0,0.8)"
 COLOR_GAUGE_NEEDLE_BORDER = "rgba(0,0,0,1)"
-COLOR_GAUGE_BACKGROUND = "rgba(255,255,255,0.0)"
+COLOR_GAUGE_BACKGROUND = "rgba(255,255,255,0.0)" # Gauges often look better transparent against plot_bg
 COLOR_GAUGE_BORDERCOLOR = "rgba(0,0,0,0.1)"
 
 COLOR_SCHEME_RADAR_DEFAULT = COLOR_SCHEME_RADAR_OPTIMAL
 RADAR_FILL_OPACITY = 0.10
-COLOR_RADAR_POLAR_BACKGROUND = COLOR_PLOT_BACKGROUND
+COLOR_RADAR_POLAR_BACKGROUND = COLOR_PLOT_BACKGROUND # Use the new light gray
 COLOR_RADAR_AXIS_LINE = 'rgba(0,0,0,0.5)'
-COLOR_RADAR_GRID_LINE = "rgba(0,0,0,0.25)"
-COLOR_RADAR_ANGULAR_GRID_LINE = "rgba(0,0,0,0.15)"
+COLOR_RADAR_GRID_LINE = "rgba(0,0,0,0.2)"    # More visible radial grid against light gray
+COLOR_RADAR_ANGULAR_GRID_LINE = "rgba(0,0,0,0.15)" # More visible angular grid against light gray
 FONT_SIZE_RADAR_TICK = 10
 FONT_SIZE_RADAR_ANGULAR_TICK = 11
 COLOR_RADAR_TICK_LABEL = COLOR_TEXT_PRIMARY
-COLOR_RADAR_ANGULAR_TICK_BACKGROUND = 'rgba(255,255,255,0.7)'
+COLOR_RADAR_ANGULAR_TICK_BACKGROUND = 'rgba(255,255,255,0.0)' # Keep transparent for angular ticks for now
 
 FONT_SIZE_STRESS_SEMAFORO_NUMBER = 20
 FONT_SIZE_STRESS_SEMAFORO_TITLE = 12
 FONT_SIZE_STRESS_SEMAFORO_AXIS_TICK = 8
-COLOR_STRESS_BULLET_LOW = "rgba(46, 204, 113, 0.4)"
-COLOR_STRESS_BULLET_MEDIUM = "rgba(241, 196, 15, 0.4)"
-COLOR_STRESS_BULLET_HIGH = "rgba(231, 76, 60, 0.4)"
+COLOR_STRESS_BULLET_LOW = "rgba(46, 204, 113, 0.5)" # Slightly more opaque for gray bg
+COLOR_STRESS_BULLET_MEDIUM = "rgba(241, 196, 15, 0.5)"
+COLOR_STRESS_BULLET_HIGH = "rgba(231, 76, 60, 0.5)"
 COLOR_STRESS_BULLET_BAR_BORDER = 'rgba(0,0,0,0.3)'
-COLOR_STRESS_BULLET_BACKGROUND = "rgba(255,255,255,0)"
+COLOR_STRESS_BULLET_BACKGROUND = "rgba(0,0,0,0)" # Transparent bullet background against plot_bg
 COLOR_STRESS_BULLET_BORDER = "rgba(0,0,0,0.1)"
+
+# Heatmap/Spatial Dynamics
+HEATMAP_COLORSCALE_DEFAULT = "Jet"
+HEATMAP_NBINSX_DEFAULT = 50
+HEATMAP_NBINSY_DEFAULT = 30
+HEATMAP_SHOW_POINTS_OVERLAY = False
+HEATMAP_POINT_SIZE = 2
+HEATMAP_POINT_OPACITY = 0.4
+FACILITY_OUTLINE_COLOR = 'rgba(50,50,50,0.7)'
+FACILITY_AREA_LINE_COLOR = 'rgba(100,100,100,0.5)'
+FACILITY_AREA_FILL_COLOR = 'rgba(200,200,200,0.1)'
+
 
 DEFAULT_CHART_MARGINS = dict(l=50, r=30, t=70, b=50)
 EPSILON = 1e-9
@@ -199,7 +196,8 @@ COLUMN_MAP = {
     "workload_perception": "workload_perception", "psychological_signals": "psychological_signals",
     "location_x": "location_x_coordinate",
     "location_y": "location_y_coordinate",
-    "location_area_name": "area_name"
+    "location_area_name": "area_name",
+    "employee_id": "employee_id"
 }
 
 # --- UI PLACEHOLDER TEXTS ---
@@ -218,6 +216,8 @@ Implementation requires significant historical data, trained machine learning mo
 """
 
 # --- TEXT STRINGS FOR LOCALIZATION ---
+# This section is very long, so I am keeping the structure as in your last verified complete version.
+# Ensure ALL keys and translations are present here.
 DEFAULT_LANG = "EN"
 TEXT_STRINGS = {
     "EN": {
@@ -231,7 +231,6 @@ TEXT_STRINGS = {
         "exception_detail_prefix": "Exception",
         "chart_generation_error_label": "Chart Generation Error",
         "module_in_development_warning": "Note: This module ('{module_name}') is a placeholder for future development and is not yet functional.",
-
 
         "navigation_label": "Navigation", "dashboard_nav_label": "Dashboard", "glossary_nav_label": "Glossary",
         "filters_header": "Dashboard Filters", "language_selector": "Language",
@@ -283,14 +282,18 @@ TEXT_STRINGS = {
         "workload_vs_psych_chart_title": "Workload Perception vs. Wellbeing Signals",
         "workload_perception_label": "Perceived Workload", "psychological_signals_label": "Wellbeing Signals",
 
-        "plant_map_title": "5. Interactive Facility Overview",
-        "facility_heatmap_title": "Facility Heatmap of Average Stress Levels",
-        "heatmap_no_coordinate_data": "Coordinate data (X, Y) is missing or insufficient to generate heatmap.",
-        "heatmap_no_value_data": "Metric data (e.g., Stress Level) is missing for heatmap locations.",
-        "x_coordinate_label": "X Coordinate",
-        "y_coordinate_label": "Y Coordinate",
-        "stress_level_label_short": "Stress Lvl.",
-        "individual_data_points_label": "Data Points",
+        "plant_map_title": "5. Spatial Dynamics Analysis", # Updated Title
+        "facility_heatmap_title": "Worker Density Heatmap (Avg. Stress)",
+        "facility_incident_heatmap_title": "Incident Density Heatmap",
+        "heatmap_no_coordinate_data": "Sufficient X/Y coordinate data is missing to generate the spatial map.",
+        "heatmap_no_value_data": "Metric data for spatial visualization (e.g., Stress, Incidents) is missing or invalid.",
+        "x_coordinate_label": "X Position (Facility)",
+        "y_coordinate_label": "Y Position (Facility)",
+        "density_label_short": "Density",
+        "stress_level_label_short": "Avg Stress",
+        "incident_count_label_short": "Incidents",
+        "individual_data_points_label": "Individual Records",
+        "simulating_coordinates_caption": "Note: Facility coordinates are currently simulated for demonstration.",
 
 
         "ai_insights_title": "6. Predictive Risk Insights",
@@ -337,6 +340,7 @@ TEXT_STRINGS = {
         "language_name_full_EN": "English",
         "language_name_full_ES": "Español",
 
+        # ALL YOUR INSIGHT STRINGS from previous version go here...
         "rotation_high_alert": "High Rotation Alert",
         "rotation_high_insight_v2": "Average rotation ({rotation_val}%) significantly exceeds warning ({warn_thresh}%). Target is {target_thresh}%. Prioritize root cause analysis for high-turnover areas (filter dashboard) and review exit interview data. Implement targeted retention programs for critical roles.",
         "rotation_moderate_warn": "Rotation Warning",
@@ -401,7 +405,6 @@ TEXT_STRINGS = {
         "exception_detail_prefix": "Excepción",
         "chart_generation_error_label": "Error al Generar Gráfico",
         "module_in_development_warning": "Nota: Este módulo ('{module_name}') es un marcador de posición para desarrollo futuro y aún no es funcional.",
-
         "navigation_label": "Navegación", "dashboard_nav_label": "Tablero Principal", "glossary_nav_label": "Glosario",
         "filters_header": "Filtros del Tablero", "language_selector": "Idioma",
         "select_site": "Sitio(s):", "select_region": "Región(es):", "select_department": "Departamento(s):",
@@ -450,14 +453,18 @@ TEXT_STRINGS = {
         "workload_vs_psych_chart_title": "Percepción de Carga vs. Señales de Bienestar",
         "workload_perception_label": "Percepción de Carga Laboral", "psychological_signals_label": "Señales de Bienestar",
 
-        "plant_map_title": "5. Vista Interactiva de Instalaciones",
+        "plant_map_title": "5. Vista Interactiva de Instalaciones", # Corrected based on previous title
         "facility_heatmap_title": "Mapa de Calor de Niveles de Estrés Promedio en Instalación",
-        "heatmap_no_coordinate_data": "Faltan datos de coordenadas (X, Y) o son insuficientes para generar el mapa de calor.",
-        "heatmap_no_value_data": "Faltan datos de la métrica (ej. Nivel de Estrés) para las ubicaciones del mapa de calor.",
-        "x_coordinate_label": "Coordenada X",
-        "y_coordinate_label": "Coordenada Y",
+        "facility_incident_heatmap_title": "Mapa de Calor de Densidad de Incidentes",
+        "heatmap_no_coordinate_data": "Faltan datos suficientes de coordenadas X/Y para generar el mapa espacial.",
+        "heatmap_no_value_data": "Faltan datos de la métrica para visualización espacial (ej. Estrés, Incidentes) o son inválidos.",
+        "x_coordinate_label": "Posición X (Instalación)",
+        "y_coordinate_label": "Posición Y (Instalación)",
+        "density_label_short": "Densidad",
         "stress_level_label_short": "Nivel Estrés",
+        "incident_count_label_short": "Incidentes",
         "individual_data_points_label": "Puntos de Dato",
+        "simulating_coordinates_caption": "Nota: Las coordenadas de la instalación son simuladas para demostración.",
 
 
         "ai_insights_title": "6. Perspectivas de Riesgo Predictivas",
