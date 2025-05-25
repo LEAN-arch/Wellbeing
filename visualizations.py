@@ -305,25 +305,23 @@ def create_trend_chart(df_input: pd.DataFrame, date_col: str,
     _apply_standard_layout(fig, lang, title_text_direct=title_text_direct,
                            x_axis_title_key=x_axis_title_key, y_axis_title_key=y_axis_title_key,
                            legend_params=legend_params_trend, margin_params=margin_params)
-    # Apply specific axis properties AFTER the base layout
-    fig.update_layout(
+    fig.update_layout( # Specific updates for this chart type
         xaxis_gridcolor=config.COLOR_GRID_SECONDARY,
         yaxis_gridcolor=config.COLOR_GRID_PRIMARY,
         yaxis_tickformat=(y_axis_format_str if y_axis_format_str else None)
     )
-    # Use update_xaxes to modify the existing xaxis object
-    fig.update_xaxes(
-        type='date', # Ensure Plotly treats x-axis as date for range selector functionality
+    fig.update_xaxes( # Use update_xaxes to modify existing xaxis from _apply_standard_layout
+        type='date',
         showspikes=True,
         spikemode='across+marker',
         spikesnap='cursor',
         spikethickness=1,
         spikedash='solid',
         spikecolor=config.COLOR_SPIKE_LINE,
-        rangeslider_visible=len(df[date_col].unique()) > 15,
+        rangeslider_visible=len(df[date_col].unique()) > 15 if date_col in df.columns and not df.empty else False, # Defensive check
         rangeselector=dict(
             buttons=list([
-                dict(count=1, label="1M", step="month", stepmode="todate" if not df.empty and date_col in df.columns and df[date_col].max() > pd.Timestamp.now() - pd.DateOffset(months=1) else "backward"),
+                dict(count=1, label="1M", step="month", stepmode="todate" if not df.empty and date_col in df.columns and not df[date_col].empty and df[date_col].max() > pd.Timestamp.now() - pd.DateOffset(months=1) else "backward"),
                 dict(count=3, label="3M", step="month", stepmode="backward"), dict(count=6, label="6M", step="month", stepmode="backward"),
                 dict(count=1, label="YTD", step="year", stepmode="todate"), dict(count=1, label=get_lang_text(lang, "1y_range_label", "1Y"), step="year", stepmode="backward"),
                 dict(step="all", label=get_lang_text(lang, "all_range_label", "All"))
@@ -332,7 +330,7 @@ def create_trend_chart(df_input: pd.DataFrame, date_col: str,
             bgcolor=config.COLOR_RANGESELECTOR_BACKGROUND,
             borderwidth=1, bordercolor=config.COLOR_RANGESELECTOR_BORDER,
             y=1.18, x=0.01, xanchor='left'
-        )
+        ) if date_col in df.columns and not df.empty else None # Only show if date_col is valid
     )
     return fig
 
@@ -508,10 +506,10 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
     plotted_groups_count = 0
 
     if has_groups_on_radar:
-        group_names_to_plot = [g for g in df_radar[group_col].unique()] # Keep original order from data if possible
+        group_names_to_plot = [g for g in df_radar[group_col].unique()]
         if primary_group_name and primary_group_name in group_names_to_plot:
             group_names_to_plot.remove(primary_group_name)
-            group_names_to_plot.insert(0, primary_group_name) # Plot primary group first
+            group_names_to_plot.insert(0, primary_group_name)
 
         for name_grp_radar_plot in group_names_to_plot:
             group_data_radar_df = df_radar[df_radar[group_col] == name_grp_radar_plot]
@@ -554,14 +552,14 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
     show_legend_final_radar = has_groups_on_radar or (target_values_map and plot_data_exists)
 
     title_text_direct = get_lang_text(lang, title_key)
-    margin_params = dict(l=40, r=40, t=60, b=100 if show_legend_final_radar else 70) # Adjusted bottom margin slightly more
+    margin_params = dict(l=40, r=40, t=60, b=100 if show_legend_final_radar else 70) # Increased bottom margin
     legend_params_radar = {
         "showlegend": show_legend_final_radar,
-        "orientation":"h", "yanchor":"bottom", "y": -0.35, "xanchor":"center", "x":0.5, # More space for legend below
+        "orientation":"h", "yanchor":"bottom", "y": -0.35, "xanchor":"center", "x":0.5, # More space below
         "font_size": config.FONT_SIZE_LEGEND,
         "itemsizing": 'constant',
         "title_text": get_lang_text(lang, "metrics_legend", "Legend") if has_groups_on_radar and show_legend_final_radar else "",
-        "tracegroupgap": 10 # Increased gap
+        "tracegroupgap": 10 # Spacing between legend items
     }
     _apply_standard_layout(fig, lang, title_text_direct=title_text_direct,
                            legend_params=legend_params_radar, margin_params=margin_params,
@@ -575,7 +573,7 @@ def create_enhanced_radar_chart(df_radar_input: pd.DataFrame, categories_col: st
                 linecolor=config.COLOR_RADAR_AXIS_LINE,
                 gridcolor=config.COLOR_RADAR_GRID_LINE,
                 tickfont=dict(size=config.FONT_SIZE_RADAR_TICK, color=config.COLOR_RADAR_TICK_LABEL),
-                angle=90,
+                angle=90, # Start first axis at the top
                 nticks=max(3, int(radial_range_max_final / (1 if radial_range_max_final <=5 else 2) )) if radial_range_max_final > 0 else 3 ,
                 showticklabels=True, layer='below traces'
             ),
